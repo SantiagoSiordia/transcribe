@@ -23,10 +23,11 @@ const REPO = env.REPO_URL || 'https://github.com/SantiagoSiordia/transcribe';
 const COFFEE = env.COFFEE_URL || 'https://buymeacoffee.com/santisiordia';
 const FFMPEG = env.FFMPEG_BIN || '/opt/homebrew/bin/ffmpeg';
 const WHISPER = env.WHISPER_BIN || '/opt/homebrew/bin/whisper-cli';
-// Engine: mlx-whisper when it is installed (Apple silicon; 1.4 to 1.9x faster here with the same words), whisper.cpp otherwise.
+// Engine: whisper.cpp. mlx-whisper (ENGINE=mlx) is 1.4 to 1.9x faster on this Mac, but in tests it dropped or repeated
+// whole stretches of speech after a long silence (31 of 148 words kept on one recording), so it is opt-in only.
 const MLX = env.MLX_WHISPER_BIN || path.join(os.homedir(), 'Library/Application Support/transcribe/venv/bin/mlx_whisper');
 const MLX_MODEL = env.MLX_MODEL || 'mlx-community/whisper-large-v3-turbo';
-const USE_MLX = env.ENGINE !== 'cpp' && fs.existsSync(MLX);
+const USE_MLX = env.ENGINE === 'mlx' && fs.existsSync(MLX);
 const MODEL = env.WHISPER_MODEL || path.join(os.homedir(), 'Library/Application Support/transcribe/ggml-large-v3-turbo.bin');
 const DONORS = env.DONORS_FILE || path.join(DIR, 'data/donors.json');
 const OLLAMA = env.OLLAMA_URL || 'http://127.0.0.1:11434';   // local only: transcript text never leaves this machine
