@@ -66,7 +66,8 @@
       "etaSoon": "Less than a minute left.",
       "viewLabel": "Transcript view",
       "viewStamps": "Timestamps",
-      "viewParas": "Paragraphs"
+      "viewParas": "Paragraphs",
+      "uploaded": "Uploaded. Press Transcribe when you are ready."
     },
     "es": {
       "about": "Acerca de y API",
@@ -147,7 +148,8 @@
       "etaSoon": "Falta menos de un minuto.",
       "viewLabel": "Vista de la transcripción",
       "viewStamps": "Con tiempos",
-      "viewParas": "Párrafos"
+      "viewParas": "Párrafos",
+      "uploaded": "Subido. Presiona Transcribir cuando quieras."
     }
   },
   "pages": [
@@ -340,7 +342,7 @@
         {
           "h": "What happens to your audio",
           "p": [
-            "Your file is uploaded to a computer I own, written to a temporary file, transcribed by a program running on that same computer, and deleted the moment the job ends, whether it worked or failed. Any leftover temporary file is also wiped each time the service starts.",
+            "Your file is uploaded to a computer I own, written to a temporary file, transcribed by a program running on that same computer, and deleted the moment the job ends, whether it worked or failed. Any leftover temporary file is also wiped each time the service starts. The upload starts when you choose the file; if you never press Transcribe, it is deleted after 10 minutes, or right away if you choose a different file.",
             "The transcript is held in memory for up to one hour so your browser can fetch it, then it is dropped. It is never written to disk on the server. The copy you see in the Library is saved in your own browser and you can delete it there."
           ]
         },
@@ -544,7 +546,7 @@
         {
           "h": "Qué pasa con tu audio",
           "p": [
-            "Tu archivo se sube a una computadora mía, se escribe en un archivo temporal, lo transcribe un programa en esa misma computadora, y se borra en el momento en que termina el trabajo, haya funcionado o no. Cualquier archivo temporal que quede también se elimina cada vez que el servicio arranca.",
+            "Tu archivo se sube a una computadora mía, se escribe en un archivo temporal, lo transcribe un programa en esa misma computadora, y se borra en el momento en que termina el trabajo, haya funcionado o no. Cualquier archivo temporal que quede también se elimina cada vez que el servicio arranca. La subida empieza cuando eliges el archivo; si nunca presionas Transcribir, se borra a los 10 minutos, o de inmediato si eliges otro archivo.",
             "La transcripción se mantiene en memoria hasta una hora para que tu navegador pueda recogerla, y después se descarta. Nunca se escribe en disco en el servidor. La copia que ves en la Biblioteca se guarda en tu propio navegador y ahí mismo la puedes borrar."
           ]
         },

@@ -123,7 +123,8 @@ input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,22
 .drop.over .ico{transform:translateY(-4px) scale(1.06)}
 .drop.has{border-style:solid;border-color:#C9C5F5}
 .bar{width:min(320px,100%);height:4px;border-radius:2px;background:#E8E6FC;overflow:hidden;display:none}
-.busy .bar{display:block;margin:4px 0}
+.busy .bar,.drop.up .bar{display:block;margin:4px 0}
+.drop.up #dropSub{font-family:var(--mono);color:#3730A3}
 .bar i{display:block;height:100%;border-radius:2px;background:#4F46E5;transform-origin:left;transform:scaleX(var(--p,0));transition:transform .3s var(--ease)}
 .bar.scan i{width:40%;animation:scan 1.3s ease-in-out infinite}
 @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
@@ -413,15 +414,50 @@ $('#del').onclick = () => {
 
 // ---- new transcription ----
 const drop = $('#drop');
-const status = s => { $('#status').textContent = s; $('#dropSub').textContent = busy ? s : T.dropSub; };
+let up = null;   // the chosen file's upload: { x: the request, id: set once the server has the file, go: Transcribe was pressed }
+const status = s => { $('#status').textContent = s; $('#dropSub').textContent = busy || up ? s : T.dropSub; };
 const bar = p => { $('#bar').classList.toggle('scan', p == null); $('#bar').style.setProperty('--p', p ?? 0); };   // a fraction while uploading, null = working, length unknown
-const setBusy = b => { busy = b; drop.style.minHeight = b ? drop.offsetHeight + 'px' : ''; document.body.classList.toggle('busy', b); bar(0); if (!b) $('#dropSub').textContent = T.dropSub; $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+const setBusy = b => { busy = b; drop.style.minHeight = b ? drop.offsetHeight + 'px' : ''; document.body.classList.toggle('busy', b); if (!b && !up) { bar(0); $('#dropSub').textContent = T.dropSub; } $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+function forget() {   // drop the current upload, on the server too
+  if (up) { up.x.abort(); if (up.id) fetch('/api/jobs/' + up.id, { method: 'DELETE' }); }
+  up = null; drop.classList.remove('up'); onbeforeunload = null;
+}
 function pick(f) {
   if (!f || busy) return;
+  forget();
   if (f.size > 100 * 1024 * 1024) { file = null; status(T.tooBig); }
-  else { file = f; $('#dropTitle').textContent = f.name; status(`${(f.size / 1048576).toFixed(1)} MB`); }
+  else { file = f; $('#dropTitle').textContent = f.name; upload(); }
   drop.classList.toggle('has', !!file);
   setBusy(false);
+}
+// The upload starts the moment a file is chosen, so it is usually done by the time Transcribe is pressed.
+function upload(go = false) {
+  const x = new XMLHttpRequest(), mine = up = { x, id: null, go };
+  drop.classList.add('up'); bar(0);
+  onbeforeunload = e => e.preventDefault();   // leaving mid-upload loses the upload, so the browser asks first
+  x.open('POST', '/api/transcribe?hold=1');
+  const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
+  x.upload.onprogress = e => { if (up === mine) { bar(e.loaded / e.total); status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100))); } };
+  x.onerror = () => { if (up === mine) fail(0, {}); };
+  x.onload = () => {
+    if (up !== mine) return;
+    let r = {}; try { r = JSON.parse(x.responseText); } catch {}
+    if (x.status !== 202) return fail(x.status, r);
+    onbeforeunload = null; mine.id = r.id; bar(1);
+    mine.go ? start() : status(T.uploaded);
+  };
+  x.send(file);
+}
+async function start() {
+  const { id } = up, name = file.name;
+  bar(null); status(T.working);
+  let res, r = {};
+  try { res = await fetch(`/api/jobs/${id}/start?language=${lang}`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
+  if (res.status === 404) return upload(true);   // it waited over 10 minutes and the server deleted it: send it again, then start
+  if (!res.ok) return fail(res.status, r);
+  up = null; drop.classList.remove('up');
+  localStorage.setItem('pending', JSON.stringify({ id, name }));   // from here a reload picks the job back up
+  poll(id, name);
 }
 $('#file').onchange = e => pick(e.target.files[0]);
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
@@ -441,26 +477,17 @@ thumb(); addEventListener('resize', thumb); document.fonts.ready.then(thumb);
 requestAnimationFrame(() => requestAnimationFrame(() => $('#langs').classList.add('ready')));   // after the first paint, so the thumb does not slide in from nowhere
 function fail(code, r) {
   localStorage.removeItem('pending'); onbeforeunload = null;
+  if (up) up.x.abort();
+  up = null; drop.classList.remove('up');
   if (code === 401) localStorage.removeItem('apiKey');
   status(code === 429 ? T.rateLimited.replace('{n}', r.error.match(/\d+/)[0]).replace('{m}', Math.ceil(r.retryAfter / 60)) : T.failed.replace('{e}', tr(r.error) || T.offline));
   setBusy(false);
 }
 $('#go').onclick = () => {
-  const name = file.name, x = new XMLHttpRequest();
   setBusy(true);
-  onbeforeunload = e => e.preventDefault();   // leaving mid-upload loses the upload, so the browser asks first
-  x.open('POST', '/api/transcribe?language=' + lang);
-  const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
-  x.upload.onprogress = e => { bar(e.loaded / e.total); status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100))); };
-  x.onerror = () => fail(0, {});
-  x.onload = () => {
-    let r = {}; try { r = JSON.parse(x.responseText); } catch {}
-    if (x.status !== 202) return fail(x.status, r);
-    onbeforeunload = null;
-    localStorage.setItem('pending', JSON.stringify({ id: r.id, name }));   // from here a reload picks the job back up
-    poll(r.id, name);
-  };
-  x.send(file);
+  if (!up) upload(true);          // the earlier upload failed: try again
+  else if (up.id) start();
+  else up.go = true;              // still uploading: start as soon as it lands
 };
 async function poll(id, name) {
   let r;

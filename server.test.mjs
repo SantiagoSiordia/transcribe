@@ -14,6 +14,8 @@ const take = limiter(3, 1000);
 assert.deepEqual([take('a', 0).ok, take('a', 1).ok, take('a', 2).ok, take('a', 3).ok], [true, true, true, false]);
 assert.equal(take('a', 500).retryAfter, 1);
 assert.equal(take('b', 3).ok, true);            // other callers are unaffected
+assert.equal(take.peek('c', 0).ok, true); assert.equal(take.peek('c', 0).remaining, 3);   // peeking spends nothing
+assert.equal(take.peek('a', 500).ok, false);
 assert.equal(take('a', 1001).ok, true);         // first hit expired
 
 // webhook signature: hex or base64 of HMAC-SHA256(raw body), nothing else
@@ -80,6 +82,18 @@ const claimed = await (await post('/api/claim', JSON.stringify({ email: 'ana@exa
 assert.match(claimed.key, /^tr_/);
 assert.equal((await post('/api/claim', JSON.stringify({ email: 'nobody@example.com' }))).status, 404);
 assert.equal((await fetch(base + '/api/jobs/nope')).status, 404);
+// upload now, start later: a held upload waits, a newer one from the same caller replaces it, and it starts exactly once
+const h1 = await (await post('/api/transcribe?hold=1', 'not audio')).json();
+assert.equal(h1.status, 'uploaded');
+const h2 = await (await post('/api/transcribe?hold=1', 'not audio')).json();
+assert.equal((await fetch(base + '/api/jobs/' + h1.id)).status, 404);          // replaced, and its file is gone
+assert.equal(fs.readdirSync(process.env.TMP_DIR).filter(f => f === h1.id).length, 0);
+assert.equal((await post(`/api/jobs/${h2.id}/start?language=xx`, '')).status, 400);
+const started = await post(`/api/jobs/${h2.id}/start?language=es`, '');
+assert.equal(started.status, 200);
+assert.ok(['queued', 'processing'].includes((await started.json()).status));
+assert.equal((await post(`/api/jobs/${h2.id}/start`, '')).status, 409);
+assert.equal((await post('/api/jobs/nope/start', '')).status, 404);
 assert.equal((await fetch(base + '/api/bmc-webhook')).status, 405);   // opened in a browser: say POST only, not "not found"
 server.close();
 fs.rmSync(dir, { recursive: true, force: true });

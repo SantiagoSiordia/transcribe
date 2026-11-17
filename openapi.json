@@ -35,6 +35,14 @@
               ],
               "default": "auto"
             }
+          },
+          {
+            "name": "hold",
+            "in": "query",
+            "description": "Add `hold=1` to upload without starting. The job waits with status `uploaded` until `POST /api/jobs/{id}/start`, and is deleted after 10 minutes if never started. Each caller can have one waiting upload; a new one replaces it.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -248,6 +256,59 @@
           }
         }
       }
+    },
+    "/api/jobs/{id}/start": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Start an upload made with hold=1",
+        "description": "Counts against the hourly limit at this point, not at upload.",
+        "parameters": [
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "en",
+                "es"
+              ]
+            },
+            "description": "Overrides the language given at upload."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queued. Poll `/api/jobs/{id}`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown upload, or it waited more than 10 minutes"
+          },
+          "409": {
+            "description": "Already started"
+          },
+          "429": {
+            "description": "Hourly limit reached"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -281,6 +342,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "uploaded",
               "queued",
               "processing",
               "done",

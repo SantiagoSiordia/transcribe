@@ -13,7 +13,7 @@ The whole server is one file, [`server.mjs`](server.mjs), with no dependencies.
 
 | What | Where it lives | When it goes away | Code |
 |---|---|---|---|
-| Your audio | A temp file | The moment its job ends, success or failure; also wiped at every start | `transcribe()`, its `finally` block, and the first lines of `createServer()` |
+| Your audio | A temp file | The moment its job ends, success or failure; after 10 minutes if you chose a file but never pressed Transcribe; also wiped at every start | `transcribe()`, its `finally` block, and the first lines of `createServer()` |
 | The transcript | Server memory, never disk | One hour after the job ends, or immediately when the page fetches it and sends `DELETE` | the sweep at the bottom, `DELETE /api/jobs/{id}` |
 | Your IP address | Server memory, for the hourly limit | One hour | `limiter()` |
 | Donor email | Only as a SHA-256 hash, next to the key | When a donation is refunded | `grant()`, `revoke()` |

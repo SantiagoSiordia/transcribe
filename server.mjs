@@ -1,6 +1,7 @@
 // transcribe.santisiordia.com: free audio transcription with a local Whisper model.
 // Zero dependencies. What is kept, in full:
-//   - uploaded audio: a temp file, deleted the moment its job ends (see transcribe()) and on every start
+//   - uploaded audio: a temp file, deleted the moment its job ends (see transcribe()) and on every start;
+//     an upload that is never started is deleted after 10 minutes (HOLD_TTL)
 //   - transcripts: in memory only, dropped RESULT_TTL after the job ends (see the sweep at the bottom)
 //   - data/donors.json: sha256(donor email) -> API key. No plain emails, no IPs, no request logs.
 import http from 'node:http';
@@ -28,6 +29,7 @@ const MAX_BYTES = 100 * 1024 * 1024;   // Cloudflare's free-plan upload ceiling
 const MAX_SECONDS = 3 * 3600;
 const MAX_QUEUE = 20;                  // waiting + uploading; bounds temp disk to ~2 GB
 const RESULT_TTL = 3600e3;
+const HOLD_TTL = 600e3;                // an upload nobody started is deleted after 10 minutes
 const PER_HOUR = { free: 3, donor: 30 };
 const LANGS = ['auto', 'en', 'es'];
 // Only real audio/video containers, only local files: a playlist-style upload cannot make ffmpeg read other paths or URLs.
@@ -36,13 +38,15 @@ const FORMATS = 'mp3,wav,ogg,flac,aac,amr,aiff,caf,asf,matroska,webm,mov,mp4,m4a
 // ---- rate limiting (sliding window, memory only) ----------------------------
 export function limiter(max, windowMs = 3600e3) {
   const hits = new Map();
-  const take = (key, now = Date.now()) => {
+  const check = (key, now, spend) => {
     const h = (hits.get(key) || []).filter(t => now - t < windowMs);
     const ok = h.length < max;
-    if (ok) h.push(now);
+    if (ok && spend) h.push(now);
     hits.set(key, h);
     return { ok, limit: max, remaining: max - h.length, retryAfter: ok ? 0 : Math.ceil((h[0] + windowMs - now) / 1000) };
   };
+  const take = (key, now = Date.now()) => check(key, now, true);
+  take.peek = (key, now = Date.now()) => check(key, now, false);   // would it be allowed? Spends nothing.
   take.sweep = (now = Date.now()) => { for (const [k, h] of hits) if (!h.some(t => now - t < windowMs)) hits.delete(k); };
   return take;
 }
@@ -227,12 +231,14 @@ export function createServer() {
         const key = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
         if (key && !isDonorKey(key)) return send(res, 401, { error: 'unknown API key' });
         if (Number(req.headers['content-length']) > MAX_BYTES) return send(res, 413, { error: 'file is larger than 100 MB' });
-        if (queue.length + uploading >= MAX_QUEUE) return send(res, 503, { error: 'the queue is full, try again in a few minutes' }, 'application/json', { 'Retry-After': '120' });
-        const lim = key ? limits.donor(key) : limits.free(ip(req));
+        const hold = url.searchParams.has('hold'), owner = key || ip(req);
+        const held = [...jobs.values()].filter(j => j.status === 'uploaded');
+        if (queue.length + uploading + held.length >= MAX_QUEUE) return send(res, 503, { error: 'the queue is full, try again in a few minutes' }, 'application/json', { 'Retry-After': '120' });
+        const lim = (l => (hold ? l.peek(owner) : l(owner)))(key ? limits.donor : limits.free);   // a held upload spends its slot when it is started
         const rate = { 'X-RateLimit-Limit': lim.limit, 'X-RateLimit-Remaining': lim.remaining };
         if (!lim.ok) return send(res, 429, { error: `limit of ${lim.limit} transcriptions per hour reached`, retryAfter: lim.retryAfter },
           'application/json', { ...rate, 'Retry-After': lim.retryAfter });
-        const job = { id: crypto.randomUUID(), status: 'queued', language, donor: !!key };
+        const job = { id: crypto.randomUUID(), status: hold ? 'uploaded' : 'queued', language, donor: !!key, owner };
         job.file = path.join(TMP, job.id);
         let n = 0;
         uploading++;
@@ -246,10 +252,34 @@ export function createServer() {
           return send(res, n > MAX_BYTES ? 413 : 400, { error: e.message }, 'application/json', rate);
         } finally { uploading--; }
         jobs.set(job.id, job);
+        if (hold) {
+          // ponytail: one waiting upload per caller, so repeated uploads cannot fill the disk. They can still burn bandwidth; rate-limit uploads if that is abused.
+          for (const j of held) if (j.owner === owner) { jobs.delete(j.id); fs.rmSync(j.file, { force: true }); }
+          job.held = Date.now();
+          return send(res, 202, view(job), 'application/json', rate);
+        }
         enqueue(queue, job);
         const body = view(job);
         pump();
         return send(res, 202, body, 'application/json', rate);
+      }
+
+      const go = /^\/api\/jobs\/([\w-]+)\/start$/.exec(p);
+      if (go && req.method === 'POST') {
+        const j = jobs.get(go[1]);
+        if (!j) return send(res, 404, { error: 'no such upload (uploads that are not started are deleted after 10 minutes)' });
+        if (j.status !== 'uploaded') return send(res, 409, { error: 'this upload was already started' });
+        const language = url.searchParams.get('language') || j.language;
+        if (!LANGS.includes(language)) return send(res, 400, { error: `language must be one of ${LANGS.join(', ')}` });
+        const lim = (j.donor ? limits.donor : limits.free)(j.owner);
+        const rate = { 'X-RateLimit-Limit': lim.limit, 'X-RateLimit-Remaining': lim.remaining };
+        if (!lim.ok) return send(res, 429, { error: `limit of ${lim.limit} transcriptions per hour reached`, retryAfter: lim.retryAfter },
+          'application/json', { ...rate, 'Retry-After': lim.retryAfter });
+        Object.assign(j, { status: 'queued', language });
+        enqueue(queue, j);
+        const body = view(j);
+        pump();
+        return send(res, 200, body, 'application/json', rate);
       }
 
       const one = /^\/api\/jobs\/([\w-]+)$/.exec(p);
@@ -262,7 +292,8 @@ export function createServer() {
         if (!j) return send(res, 404, { error: 'no such job' });
         jobs.delete(j.id);
         const i = queue.indexOf(j);
-        if (i >= 0) { queue.splice(i, 1); fs.rmSync(j.file, { force: true }); }
+        if (i >= 0) queue.splice(i, 1);
+        if (i >= 0 || j.status === 'uploaded') fs.rmSync(j.file, { force: true });
         return send(res, 200, { ok: true });   // a job already running finishes, then its result is discarded
       }
 
@@ -296,7 +327,10 @@ export function createServer() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   setInterval(() => {
     const now = Date.now();
-    for (const [id, j] of jobs) if (j.finished && now - j.finished > RESULT_TTL) jobs.delete(id);
+    for (const [id, j] of jobs) {
+      if (j.finished && now - j.finished > RESULT_TTL) jobs.delete(id);
+      if (j.status === 'uploaded' && now - j.held > HOLD_TTL) { jobs.delete(id); fs.rmSync(j.file, { force: true }); }
+    }
     for (const l of Object.values(limits)) l.sweep(now);
   }, 60e3).unref();
   // Always 127.0.0.1, never *:port. The Cloudflare tunnel is the only way in.
