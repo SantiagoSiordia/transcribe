@@ -59,3 +59,5 @@ Page copy and the SEO landing pages live in `pages.json`; `index.html` is the si
 ## License
 
 MIT
+
+Bundled in `public/`: Swagger UI (Apache-2.0) and the Inter typeface (SIL OFL 1.1), self-hosted so the page makes no third-party requests.
