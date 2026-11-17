@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret', STATS_FILE: path.join(dir, 'stats.json'), ADMIN_KEY: 'adm1n' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count, pool, parts } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count, pool, parts, parseEngineJson } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -67,6 +67,12 @@ count('jobs', 1, '203.0.113.7', d1); count('jobs', 1, '203.0.113.7', d1);
 assert.deepEqual([count('jobs', 1, '198.51.100.2', d1).users, count('jobs', 0, undefined, d1).jobs], [2, 3]);
 assert.equal(count('jobs', 1, '203.0.113.7', d2).users, 1);
 assert.ok(!fs.readFileSync(process.env.STATS_FILE, 'utf8').includes('203.0.113'));
+
+// engine output: Python's NaN/Infinity scores must not break parsing, and the spoken words must not be touched
+const eng = parseEngineJson('{"segments": [{"text": " To Infinity, and NaN: NaN, they said", "avg_logprob": NaN, "x": -Infinity, "y": [1, 2]}], "language": "en"}');
+assert.equal(eng.segments[0].avg_logprob, null);
+assert.equal(eng.segments[0].x, null);
+assert.equal(eng.segments[0].text, ' To Infinity, and NaN: NaN, they said');
 
 // pages: every page renders with no placeholder left, and each has its language pair
 const pages = buildPages();

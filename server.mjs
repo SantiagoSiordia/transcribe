@@ -137,6 +137,9 @@ export function eta(job, now = Date.now()) {
 // Extra whisper.cpp flags, off by default. '-bs 1 -bo 1 -mc 0' looked 1.6x faster on one test file but skipped
 // 16% of the words on a mixed English/Spanish recording, so do not turn it on without checking word counts.
 const FAST = (env.WHISPER_ARGS ?? '').split(' ').filter(Boolean);
+// mlx-whisper writes its scores with Python's json, which emits NaN and Infinity (a silent stretch has no score).
+// Those are not JSON. Strings are matched first and left alone, so the same words inside the transcript stay as spoken.
+export const parseEngineJson = raw => JSON.parse(raw.replace(/"(?:[^"\\]|\\.)*"|-?Infinity|NaN/g, m => (m[0] === '"' ? m : 'null')));
 async function transcribe(job) {
   const wav = job.file + '.wav', out = job.file + '-out';   // no dot: mlx-whisper cuts the output name at the last one
   try {
@@ -162,7 +165,7 @@ async function transcribe(job) {
     }
     // learn this machine's speed from every finished job, so the first estimate of the next one is close
     rate = 0.7 * rate + 0.3 * Math.max((Date.now() - job.started) / 1000 - LOAD, 0.1) / seconds;
-    const j = JSON.parse(fs.readFileSync(out + '.json', 'utf8'));
+    const j = parseEngineJson(fs.readFileSync(out + '.json', 'utf8'));
     const segments = (USE_MLX ? j.segments.map(s => ({ start: s.start, end: s.end, text: s.text.trim() }))
       : j.transcription.map(s => ({ start: s.offsets.from / 1000, end: s.offsets.to / 1000, text: s.text.trim() })))
       .filter(s => s.text);
