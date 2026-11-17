@@ -1,0 +1,346 @@
+{
+  "strings": {
+    "en": {
+      "about": "About and API",
+      "coffeeBtn": "Buy me a coffee",
+      "langSwitch": "Español",
+      "library": "Library",
+      "searchLabel": "Search transcripts",
+      "searchPh": "Search by name or date",
+      "emptyLib": "Your transcripts will show up here. They are saved in this browser only.",
+      "privCard": "Nothing is stored on the server. Your audio is deleted right after it is transcribed, and this library lives in your browser.",
+      "privLink": "Read the code",
+      "language": "Language",
+      "auto": "Auto",
+      "english": "English",
+      "spanish": "Spanish",
+      "mixed": "Mixed",
+      "mixedTip": "Detects the main language. The model follows one language per file, so words in a second language can come out less accurate.",
+      "dropTitle": "Drop an audio file here",
+      "dropSub": "MP3, M4A, WAV, OGG, OPUS or WEBM. Up to 100 MB and 3 hours.",
+      "choose": "Choose file",
+      "noFile": "No file selected",
+      "transcribe": "Transcribe",
+      "transcribing": "Transcribing...",
+      "uploading": "Uploading, {p}%",
+      "queued": "In line, {n} ahead of you. Keep this tab open.",
+      "working": "Working on it. Keep this tab open.",
+      "tooBig": "That file is larger than 100 MB.",
+      "failed": "That did not work: {e}",
+      "offline": "could not reach the server",
+      "rateLimited": "You have used your {n} transcriptions for this hour. Try again in {m} minutes.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "download": "Download .txt",
+      "del": "Delete",
+      "delConfirm": "Delete this transcript from this browser?",
+      "today": "Today",
+      "readyTitle": "Your transcript is ready",
+      "aboutTitle": "About Transcribe",
+      "modalBody": "This project is free, and anyone is welcome to use it. If it saved you time, a coffee helps keep it running.",
+      "ossTitle": "Open source, nothing kept",
+      "ossBody": "Your audio is deleted as soon as it is transcribed, and transcripts are saved only in your browser. The code is public, so you can check.",
+      "ossLink": "View the code on GitHub",
+      "keyTitle": "Donated? Get your API key",
+      "keyBody": "Supporters get 30 transcriptions per hour and skip the line. Enter the email you used on Buy Me a Coffee.",
+      "keyBtn": "Get my key",
+      "keyNone": "No donation found for that email yet. It can take a minute to arrive.",
+      "keyOk": "Thank you. Your key is saved in this browser and used here automatically:",
+      "emailLabel": "Email address",
+      "apiTitle": "Prefer the command line?",
+      "apiBody": "Use the free API from the CLI or any REST client, no key needed. Each person gets 3 transcriptions per hour, and each file can be up to 3 hours long and 100 MB.",
+      "apiBtn": "View API docs",
+      "later": "Maybe later",
+      "close": "Close",
+      "footDocs": "API docs",
+      "footCode": "Source code",
+      "faqTitle": "Questions"
+    },
+    "es": {
+      "about": "Acerca de y API",
+      "coffeeBtn": "Invítame un café",
+      "langSwitch": "English",
+      "library": "Biblioteca",
+      "searchLabel": "Buscar transcripciones",
+      "searchPh": "Buscar por nombre o fecha",
+      "emptyLib": "Tus transcripciones aparecerán aquí. Se guardan solo en este navegador.",
+      "privCard": "No se guarda nada en el servidor. Tu audio se borra en cuanto se transcribe, y esta biblioteca vive en tu navegador.",
+      "privLink": "Lee el código",
+      "language": "Idioma",
+      "auto": "Auto",
+      "english": "Inglés",
+      "spanish": "Español",
+      "mixed": "Mixto",
+      "mixedTip": "Detecta el idioma principal. El modelo sigue un idioma por archivo, así que las palabras en un segundo idioma pueden salir menos precisas.",
+      "dropTitle": "Suelta un archivo de audio aquí",
+      "dropSub": "MP3, M4A, WAV, OGG, OPUS o WEBM. Hasta 100 MB y 3 horas.",
+      "choose": "Elegir archivo",
+      "noFile": "Ningún archivo seleccionado",
+      "transcribe": "Transcribir",
+      "transcribing": "Transcribiendo...",
+      "uploading": "Subiendo, {p}%",
+      "queued": "En fila, {n} antes que tú. Deja esta pestaña abierta.",
+      "working": "Trabajando en ello. Deja esta pestaña abierta.",
+      "tooBig": "Ese archivo pesa más de 100 MB.",
+      "failed": "No funcionó: {e}",
+      "offline": "no se pudo conectar con el servidor",
+      "rateLimited": "Ya usaste tus {n} transcripciones de esta hora. Intenta de nuevo en {m} minutos.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "download": "Descargar .txt",
+      "del": "Borrar",
+      "delConfirm": "¿Borrar esta transcripción de este navegador?",
+      "today": "Hoy",
+      "readyTitle": "Tu transcripción está lista",
+      "aboutTitle": "Acerca de Transcribe",
+      "modalBody": "Este proyecto es gratis y cualquiera puede usarlo. Si te ahorró tiempo, un café ayuda a mantenerlo funcionando.",
+      "ossTitle": "Código abierto, no se guarda nada",
+      "ossBody": "Tu audio se borra en cuanto se transcribe, y las transcripciones se guardan solo en tu navegador. El código es público, así que puedes comprobarlo.",
+      "ossLink": "Ver el código en GitHub",
+      "keyTitle": "¿Donaste? Obtén tu clave de API",
+      "keyBody": "Quienes apoyan el proyecto tienen 30 transcripciones por hora y pasan primero en la fila. Escribe el correo que usaste en Buy Me a Coffee.",
+      "keyBtn": "Obtener mi clave",
+      "keyNone": "Aún no hay una donación con ese correo. Puede tardar un minuto en llegar.",
+      "keyOk": "Gracias. Tu clave quedó guardada en este navegador y se usa aquí automáticamente:",
+      "emailLabel": "Correo electrónico",
+      "apiTitle": "¿Prefieres la línea de comandos?",
+      "apiBody": "Usa la API gratuita desde la terminal o cualquier cliente REST, sin clave. Cada persona tiene 3 transcripciones por hora, y cada archivo puede durar hasta 3 horas y pesar 100 MB.",
+      "apiBtn": "Ver la documentación de la API",
+      "later": "Quizá después",
+      "close": "Cerrar",
+      "footDocs": "Documentación de la API",
+      "footCode": "Código fuente",
+      "faqTitle": "Preguntas"
+    }
+  },
+  "pages": [
+    {
+      "path": "/", "lang": "en", "alt": "/es", "nav": "Transcribe audio to text",
+      "title": "Transcribe audio to text free, no sign-up | Transcribe",
+      "description": "Free audio to text transcription with timestamps. Upload an MP3, M4A, WAV or voice note and get the text back. No account, open source, and your audio is never stored.",
+      "h1": "Transcribe audio to text",
+      "sub": "Drop in a recording and get the text back. Free, no sign-up.",
+      "sections": [
+        { "h": "How it works", "p": [
+          "Choose a recording, pick the language or leave it on Auto, and press Transcribe. You get the text split into short segments, each with the time it starts, ready to copy or download as a .txt file.",
+          "The transcription is done by Whisper large-v3-turbo, an open speech recognition model, running on a computer I own. Your file is not sent to any other company."
+        ] },
+        { "h": "Free, and nothing is kept", "p": [
+          "There is no account and no paid plan. Each person can transcribe 3 files per hour, up to 3 hours and 100 MB each.",
+          "Your audio is deleted the moment the transcript is produced. Transcripts are saved in your own browser, not on the server. The project is open source, so anyone can <a href=\"https://github.com/SantiagoSiordia/transcribe\">read the code</a> and confirm it. See the <a href=\"/privacy\">privacy page</a> for the details."
+        ] }
+      ],
+      "faq": [
+        { "q": "Is it really free?", "a": "Yes. It runs on my own computer, so there is no bill per minute of audio. If it saves you time you can buy me a coffee, but nothing is locked behind a payment." },
+        { "q": "Which languages does it understand?", "a": "English and Spanish are the ones I test. On Auto, Whisper detects the language by itself and handles many others, with accuracy that varies by language." },
+        { "q": "How long does it take?", "a": "A one-hour recording usually takes a few minutes. Files are transcribed one at a time, so at busy moments you wait in a short line and the page tells you your place." },
+        { "q": "Is there an API?", "a": "Yes, and it needs no key. See the <a href=\"/docs\">API docs</a>. People who donate get a key with 30 transcriptions per hour." }
+      ]
+    },
+    {
+      "path": "/mp3-to-text", "lang": "en", "alt": "/es/mp3-a-texto", "nav": "MP3 to text",
+      "title": "MP3 to text: free online transcription with timestamps",
+      "description": "Convert an MP3 to text for free. Upload the file and get a transcript with timestamps to copy or download. No sign-up, and the MP3 is deleted after it is transcribed.",
+      "h1": "MP3 to text",
+      "sub": "Upload an MP3 and get a transcript with timestamps. Free, no sign-up.",
+      "sections": [
+        { "h": "Turn an MP3 into text", "p": [
+          "Interviews, lectures, podcasts and meeting recordings usually end up as MP3 files. Drop one above and you get the full text, split into segments with the time each one starts, so you can jump back to the right spot in the recording.",
+          "MP3 files of up to 100 MB are accepted, which is about 3 hours of speech at a typical podcast bitrate. If your file is larger, exporting it as mono at 64 kbps keeps speech clear and makes it much smaller."
+        ] }
+      ],
+      "faq": [
+        { "q": "Do I need to convert the MP3 first?", "a": "No. Upload the MP3 as it is." },
+        { "q": "Can I get the result as a text file?", "a": "Yes. Use the download button on the transcript to save a .txt file, or the copy button to paste it somewhere else." },
+        { "q": "What happens to my MP3?", "a": "It is deleted as soon as the transcript is produced. Nothing is stored on the server; see the <a href=\"/privacy\">privacy page</a>." }
+      ]
+    },
+    {
+      "path": "/m4a-to-text", "lang": "en", "alt": "/es/m4a-a-texto", "nav": "M4A to text",
+      "title": "M4A to text: transcribe iPhone recordings free",
+      "description": "Transcribe M4A files to text for free. Works with iPhone Voice Memos and other M4A recordings. Timestamps included, no sign-up, audio deleted after transcription.",
+      "h1": "M4A to text",
+      "sub": "Transcribe M4A recordings, including iPhone Voice Memos. Free, no sign-up.",
+      "sections": [
+        { "h": "Transcribe an M4A file", "p": [
+          "M4A is the format iPhones and Macs use for Voice Memos, and many call recorders use it too. Drop the file above and you get the text with timestamps, without converting it to MP3 first.",
+          "On an iPhone, open Voice Memos, tap the recording, tap the three dots and choose Save to Files. Then choose that file here."
+        ] }
+      ],
+      "faq": [
+        { "q": "Does it work on a phone?", "a": "Yes. The page works in the phone's browser and you can pick the recording from your files." },
+        { "q": "How long can the recording be?", "a": "Up to 3 hours and 100 MB per file." },
+        { "q": "Is my recording kept?", "a": "No. It is deleted right after it is transcribed, and the transcript is saved only in your browser." }
+      ]
+    },
+    {
+      "path": "/voice-memo-to-text", "lang": "en", "alt": "/es/nota-de-voz-a-texto", "nav": "Voice memo to text",
+      "title": "Voice memo to text: free transcription, no app needed",
+      "description": "Turn a voice memo into text for free, in the browser, with no app to install. Timestamps included. Your recording is deleted as soon as it is transcribed.",
+      "h1": "Voice memo to text",
+      "sub": "Turn a voice memo into text in your browser. Free, no app to install.",
+      "sections": [
+        { "h": "From a voice memo to written notes", "p": [
+          "Recording a thought is quick; finding it again later is not. Upload the memo above and you get text you can search, copy into your notes or send to someone.",
+          "It works with recordings from iPhone Voice Memos, Android recorder apps and most other recorders, since they save M4A, MP3, WAV or OGG files."
+        ] }
+      ],
+      "faq": [
+        { "q": "Do I need to install anything?", "a": "No. It runs in the browser on a phone or a computer." },
+        { "q": "Can it handle a long memo?", "a": "Yes, up to 3 hours and 100 MB per file." },
+        { "q": "Who can hear my memo?", "a": "Nobody. A program transcribes it on my own computer and the file is deleted right after. The code is public if you want to check." }
+      ]
+    },
+    {
+      "path": "/whatsapp-voice-message-to-text", "lang": "en", "alt": "/es/transcribir-notas-de-voz-whatsapp", "nav": "WhatsApp voice message to text",
+      "title": "WhatsApp voice message to text: free transcription",
+      "description": "Convert a WhatsApp voice message to text for free. Share or export the audio, upload it here and read it instead of listening. No sign-up, nothing stored.",
+      "h1": "WhatsApp voice message to text",
+      "sub": "Read a voice message instead of listening to it. Free, no sign-up.",
+      "sections": [
+        { "h": "How to transcribe a WhatsApp voice message", "p": [
+          "In WhatsApp, press and hold the voice message, choose Share (or Forward, then Share on iPhone) and save it to your files. Then choose that file above. WhatsApp voice messages are OPUS or OGG files, and both are accepted as they are.",
+          "This is handy for long messages when you cannot listen, or when you need to quote exactly what was said."
+        ] }
+      ],
+      "faq": [
+        { "q": "Does this connect to my WhatsApp account?", "a": "No. You upload only the audio file you choose. The site never sees your chats or contacts." },
+        { "q": "Does it work with messages in Spanish?", "a": "Yes. Pick Spanish, or leave it on Auto." },
+        { "q": "Is the voice message stored?", "a": "No. It is deleted as soon as the transcript is produced." }
+      ]
+    },
+    {
+      "path": "/privacy", "lang": "en", "alt": "/es/privacidad", "nav": "Privacy",
+      "title": "Privacy: what happens to your audio | Transcribe",
+      "description": "Exactly what Transcribe keeps: nothing. Audio is deleted after transcription, transcripts stay in your browser, there are no accounts, cookies or trackers, and the code is public.",
+      "h1": "Transcribe audio, privately",
+      "sub": "Your audio is deleted after transcription. The details are below.",
+      "sections": [
+        { "h": "What happens to your audio", "p": [
+          "Your file is uploaded to a computer I own, written to a temporary file, transcribed by a program running on that same computer, and deleted the moment the job ends, whether it worked or failed. Any leftover temporary file is also wiped each time the service starts.",
+          "The transcript is held in memory for up to one hour so your browser can fetch it, then it is dropped. It is never written to disk on the server. The copy you see in the Library is saved in your own browser and you can delete it there."
+        ] },
+        { "h": "What is and is not collected", "p": [
+          "There are no accounts, no cookies, no analytics scripts and no requests to other companies from this page; the font and every script are served from this site.",
+          "To enforce the limit of 3 transcriptions per hour, the server remembers your IP address in memory for one hour. It is not written to a log. The site is delivered through Cloudflare, which carries the traffic as it does for a large part of the web.",
+          "If you donate and claim an API key, the server stores a one-way hash of your email next to the key, not the email itself.",
+          "I am not interested in your data. The project is open source so you do not have to take my word for it: <a href=\"https://github.com/SantiagoSiordia/transcribe\">read the code</a>."
+        ] }
+      ]
+    },
+    {
+      "path": "/es", "lang": "es", "alt": "/", "nav": "Transcribir audio a texto",
+      "title": "Transcribir audio a texto gratis y sin registro | Transcribe",
+      "description": "Transcribe audio a texto gratis, con marcas de tiempo. Sube un MP3, M4A, WAV o una nota de voz y recibe el texto. Sin cuenta, de código abierto y sin guardar tu audio.",
+      "h1": "Transcribir audio a texto",
+      "sub": "Sube una grabación y recibe el texto. Gratis y sin registro.",
+      "sections": [
+        { "h": "Cómo funciona", "p": [
+          "Elige una grabación, selecciona el idioma o déjalo en Auto, y presiona Transcribir. Recibes el texto dividido en segmentos cortos, cada uno con el momento en que empieza, listo para copiar o descargar como archivo .txt.",
+          "La transcripción la hace Whisper large-v3-turbo, un modelo abierto de reconocimiento de voz, en una computadora mía. Tu archivo no se envía a ninguna otra empresa."
+        ] },
+        { "h": "Gratis, y no se guarda nada", "p": [
+          "No hay cuenta ni plan de pago. Cada persona puede transcribir 3 archivos por hora, de hasta 3 horas y 100 MB cada uno.",
+          "Tu audio se borra en el momento en que se genera la transcripción. Las transcripciones se guardan en tu propio navegador, no en el servidor. El proyecto es de código abierto, así que cualquiera puede <a href=\"https://github.com/SantiagoSiordia/transcribe\">leer el código</a> y confirmarlo. Los detalles están en la <a href=\"/es/privacidad\">página de privacidad</a>."
+        ] }
+      ],
+      "faq": [
+        { "q": "¿De verdad es gratis?", "a": "Sí. Funciona en mi propia computadora, así que no pago por minuto de audio. Si te ahorra tiempo puedes invitarme un café, pero nada está bloqueado detrás de un pago." },
+        { "q": "¿Qué idiomas entiende?", "a": "Español e inglés son los que pruebo. En Auto, Whisper detecta el idioma por sí solo y maneja muchos más, con una precisión que varía según el idioma." },
+        { "q": "¿Cuánto tarda?", "a": "Una grabación de una hora suele tardar unos minutos. Los archivos se transcriben uno a la vez, así que en momentos de mucho uso esperas en una fila corta y la página te dice tu lugar." },
+        { "q": "¿Hay una API?", "a": "Sí, y no necesita clave. Consulta la <a href=\"/docs\">documentación de la API</a>. Quienes donan reciben una clave con 30 transcripciones por hora." }
+      ]
+    },
+    {
+      "path": "/es/mp3-a-texto", "lang": "es", "alt": "/mp3-to-text", "nav": "MP3 a texto",
+      "title": "MP3 a texto: transcripción online gratis con marcas de tiempo",
+      "description": "Convierte un MP3 a texto gratis. Sube el archivo y recibe la transcripción con marcas de tiempo para copiar o descargar. Sin registro, y el MP3 se borra al terminar.",
+      "h1": "MP3 a texto",
+      "sub": "Sube un MP3 y recibe la transcripción con marcas de tiempo. Gratis y sin registro.",
+      "sections": [
+        { "h": "Convierte un MP3 en texto", "p": [
+          "Entrevistas, clases, podcasts y grabaciones de reuniones suelen terminar como archivos MP3. Suelta uno arriba y recibes el texto completo, dividido en segmentos con el momento en que empieza cada uno, para volver al punto exacto de la grabación.",
+          "Se aceptan MP3 de hasta 100 MB, que son unas 3 horas de voz con la calidad habitual de un podcast. Si tu archivo pesa más, exportarlo en mono a 64 kbps mantiene la voz clara y lo hace mucho más ligero."
+        ] }
+      ],
+      "faq": [
+        { "q": "¿Tengo que convertir el MP3 antes?", "a": "No. Sube el MP3 tal como está." },
+        { "q": "¿Puedo obtener el resultado como archivo de texto?", "a": "Sí. Usa el botón de descarga de la transcripción para guardar un .txt, o el botón de copiar para pegarlo en otro lugar." },
+        { "q": "¿Qué pasa con mi MP3?", "a": "Se borra en cuanto se genera la transcripción. No se guarda nada en el servidor; consulta la <a href=\"/es/privacidad\">página de privacidad</a>." }
+      ]
+    },
+    {
+      "path": "/es/m4a-a-texto", "lang": "es", "alt": "/m4a-to-text", "nav": "M4A a texto",
+      "title": "M4A a texto: transcribe grabaciones del iPhone gratis",
+      "description": "Transcribe archivos M4A a texto gratis. Funciona con las Notas de Voz del iPhone y otras grabaciones M4A. Con marcas de tiempo, sin registro, y el audio se borra al terminar.",
+      "h1": "M4A a texto",
+      "sub": "Transcribe grabaciones M4A, incluidas las Notas de Voz del iPhone. Gratis y sin registro.",
+      "sections": [
+        { "h": "Transcribe un archivo M4A", "p": [
+          "M4A es el formato que usan el iPhone y la Mac para las Notas de Voz, y también muchas apps para grabar llamadas. Suelta el archivo arriba y recibes el texto con marcas de tiempo, sin convertirlo antes a MP3.",
+          "En un iPhone, abre Notas de Voz, toca la grabación, toca los tres puntos y elige Guardar en Archivos. Después elige ese archivo aquí."
+        ] }
+      ],
+      "faq": [
+        { "q": "¿Funciona en el celular?", "a": "Sí. La página funciona en el navegador del teléfono y puedes elegir la grabación desde tus archivos." },
+        { "q": "¿Cuánto puede durar la grabación?", "a": "Hasta 3 horas y 100 MB por archivo." },
+        { "q": "¿Se guarda mi grabación?", "a": "No. Se borra justo después de transcribirla, y la transcripción se guarda solo en tu navegador." }
+      ]
+    },
+    {
+      "path": "/es/nota-de-voz-a-texto", "lang": "es", "alt": "/voice-memo-to-text", "nav": "Nota de voz a texto",
+      "title": "Nota de voz a texto: transcripción gratis sin instalar nada",
+      "description": "Convierte una nota de voz en texto gratis, desde el navegador y sin instalar ninguna app. Con marcas de tiempo. Tu grabación se borra en cuanto se transcribe.",
+      "h1": "Nota de voz a texto",
+      "sub": "Convierte una nota de voz en texto desde tu navegador. Gratis y sin instalar nada.",
+      "sections": [
+        { "h": "De una nota de voz a apuntes escritos", "p": [
+          "Grabar una idea es rápido; encontrarla después no tanto. Sube la nota arriba y recibes texto que puedes buscar, copiar a tus apuntes o enviar a alguien.",
+          "Funciona con grabaciones de las Notas de Voz del iPhone, de las grabadoras de Android y de casi cualquier otra grabadora, porque guardan archivos M4A, MP3, WAV u OGG."
+        ] }
+      ],
+      "faq": [
+        { "q": "¿Tengo que instalar algo?", "a": "No. Funciona en el navegador, en el teléfono o en la computadora." },
+        { "q": "¿Sirve para notas largas?", "a": "Sí, hasta 3 horas y 100 MB por archivo." },
+        { "q": "¿Quién puede escuchar mi nota?", "a": "Nadie. Un programa la transcribe en mi propia computadora y el archivo se borra enseguida. El código es público por si quieres comprobarlo." }
+      ]
+    },
+    {
+      "path": "/es/transcribir-notas-de-voz-whatsapp", "lang": "es", "alt": "/whatsapp-voice-message-to-text", "nav": "Transcribir notas de voz de WhatsApp",
+      "title": "Transcribir notas de voz de WhatsApp a texto gratis",
+      "description": "Convierte un audio de WhatsApp a texto gratis. Comparte o exporta la nota de voz, súbela aquí y léela en lugar de escucharla. Sin registro y sin guardar nada.",
+      "h1": "Transcribir notas de voz de WhatsApp",
+      "sub": "Lee un audio de WhatsApp en lugar de escucharlo. Gratis y sin registro.",
+      "sections": [
+        { "h": "Cómo pasar un audio de WhatsApp a texto", "p": [
+          "En WhatsApp, mantén presionada la nota de voz, elige Compartir (en iPhone, Reenviar y luego Compartir) y guárdala en tus archivos. Después elige ese archivo arriba. Los audios de WhatsApp son archivos OPUS u OGG, y los dos se aceptan tal como están.",
+          "Sirve para audios largos cuando no puedes escuchar, o cuando necesitas citar exactamente lo que se dijo."
+        ] }
+      ],
+      "faq": [
+        { "q": "¿Esto se conecta a mi cuenta de WhatsApp?", "a": "No. Solo subes el archivo de audio que tú eliges. El sitio nunca ve tus chats ni tus contactos." },
+        { "q": "¿Funciona con audios en español?", "a": "Sí. Elige Español o déjalo en Auto." },
+        { "q": "¿Se guarda la nota de voz?", "a": "No. Se borra en cuanto se genera la transcripción." }
+      ]
+    },
+    {
+      "path": "/es/privacidad", "lang": "es", "alt": "/privacy", "nav": "Privacidad",
+      "title": "Privacidad: qué pasa con tu audio | Transcribe",
+      "description": "Exactamente lo que Transcribe guarda: nada. El audio se borra al transcribirse, las transcripciones quedan en tu navegador, no hay cuentas, cookies ni rastreadores, y el código es público.",
+      "h1": "Transcribe audio, en privado",
+      "sub": "Tu audio se borra después de transcribirse. Los detalles están abajo.",
+      "sections": [
+        { "h": "Qué pasa con tu audio", "p": [
+          "Tu archivo se sube a una computadora mía, se escribe en un archivo temporal, lo transcribe un programa en esa misma computadora, y se borra en el momento en que termina el trabajo, haya funcionado o no. Cualquier archivo temporal que quede también se elimina cada vez que el servicio arranca.",
+          "La transcripción se mantiene en memoria hasta una hora para que tu navegador pueda recogerla, y después se descarta. Nunca se escribe en disco en el servidor. La copia que ves en la Biblioteca se guarda en tu propio navegador y ahí mismo la puedes borrar."
+        ] },
+        { "h": "Qué se recopila y qué no", "p": [
+          "No hay cuentas, ni cookies, ni scripts de analítica, ni peticiones a otras empresas desde esta página; la tipografía y todos los scripts se sirven desde este sitio.",
+          "Para aplicar el límite de 3 transcripciones por hora, el servidor recuerda tu dirección IP en memoria durante una hora. No se escribe en ningún registro. El sitio se entrega a través de Cloudflare, que transporta el tráfico como lo hace para gran parte de la web.",
+          "Si donas y pides una clave de API, el servidor guarda un hash irreversible de tu correo junto a la clave, no el correo.",
+          "No me interesan tus datos. El proyecto es de código abierto para que no tengas que creerme: <a href=\"https://github.com/SantiagoSiordia/transcribe\">lee el código</a>."
+        ] }
+      ]
+    }
+  ]
+}

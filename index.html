@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<link rel="canonical" href="{{canonical}}">
+{{hreflang}}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Transcribe">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:image" content="{{origin}}/public/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/public/favicon.svg">
+<script type="application/ld+json">{{jsonld}}</script>
+<style>
+@font-face{font-family:Inter;src:url(/public/inter.woff2) format("woff2");font-weight:100 900;font-display:swap}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#17171A;background:#F4F3EF}
+button,a,input{font-family:inherit}
+button,a{cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+:focus-visible{outline:2px solid #4F46E5;outline-offset:2px}
+.page{display:flex;flex-direction:column;min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 32px;background:#FFF;border-bottom:1px solid #E6E4DE}
+.brand{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none;font-weight:700;font-size:18px;letter-spacing:-.01em}
+.logo{width:36px;height:36px;border-radius:10px;background:#4F46E5;display:flex;align-items:center;justify-content:center}
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #D9D7D0;background:#FFF;color:#17171A;font-weight:500;font-size:14px;text-decoration:none}
+.btn.coffee{background:#FFDD00;border-color:#FFDD00;font-weight:600;padding:0 18px}
+.btn.primary{background:#4F46E5;border-color:#4F46E5;color:#FFF;font-weight:600}
+.btn.dark{background:#17171A;border-color:#17171A;color:#FFF;font-weight:600}
+.btn.ghost{border-color:transparent;background:transparent;color:#5C5B66}
+.btn.outline{border-color:#C9C5F5;color:#3730A3;font-weight:600;padding:0 20px}
+.cols{display:flex;flex-wrap:wrap;flex:1;align-items:stretch}
+aside{flex:0 0 300px;max-width:100%;background:#FFF;border-right:1px solid #E6E4DE;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;font-weight:600;color:#5C5B66;text-transform:uppercase;letter-spacing:.06em}
+input[type=search],input[type=email]{padding:0 14px;min-height:44px;border:1px solid #D9D7D0;border-radius:10px;font-size:14px;background:#FAF9F6;min-width:0}
+#lib{display:flex;flex-direction:column;gap:4px}
+.day{font-size:12px;color:#5C5B66;padding:12px 6px 4px}
+.row{text-align:left;padding:12px 14px;border:1px solid transparent;background:transparent;border-radius:10px;display:flex;flex-direction:column;gap:3px;color:inherit}
+.row:hover{background:#F4F3EF}
+.row[aria-current=true]{border-color:#C9C5F5;background:#F1F0FE}
+.row b{font-size:14px;font-weight:500;overflow-wrap:anywhere}
+.row[aria-current=true] b{font-weight:600}
+.row span,.muted{font-size:12px;color:#5C5B66}
+.note{background:#F1F0FE;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5;color:#1E1B4B}
+.note a{color:#3730A3;font-weight:600}
+main{flex:999 1 560px;min-width:0;padding:32px;display:flex;flex-direction:column;gap:24px;max-width:1040px}
+.card{background:#FFF;border:1px solid #E6E4DE;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:22px;box-shadow:0 1px 2px rgba(23,23,26,.04)}
+.split{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{margin:0 0 4px;font-size:24px;font-weight:700;letter-spacing:-.02em}
+h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.sub{font-size:14px;color:#5C5B66}
+.seg{display:flex;gap:4px;padding:4px;background:#F1F0EC;border-radius:12px;flex-wrap:wrap}
+.seg button{min-height:40px;padding:0 16px;border-radius:9px;border:none;font-size:14px;font-weight:500;background:transparent;color:#5C5B66}
+.seg button[aria-pressed=true]{background:#FFF;color:#17171A;box-shadow:0 1px 3px rgba(23,23,26,.14)}
+.drop{border:2px dashed #CFCDEA;border-radius:14px;padding:36px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;background:#FAFAFE;text-align:center}
+.drop.over{border-color:#4F46E5;background:#F1F0FE}
+.drop .ico{width:52px;height:52px;border-radius:50%;background:#E8E6FC;display:flex;align-items:center;justify-content:center}
+.drop strong{font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.go{min-height:48px;padding:0 28px;border-radius:12px;border:none;background:#4F46E5;color:#FFF;font-weight:600;font-size:15px}
+.icons{display:flex;gap:4px}
+.icon{position:relative;width:44px;height:44px;border-radius:10px;border:none;background:transparent;display:flex;align-items:center;justify-content:center}
+.icon:hover{background:#ECEBFA}
+.icon.danger:hover{background:#FCECEA}
+.icon::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);right:0;background:#17171A;color:#FFF;font-size:12px;font-weight:500;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+.icon:hover::after,.icon:focus-visible::after{opacity:1}
+#segs{background:#FAF9F6;border:1px solid #ECEAE4;border-radius:12px;padding:8px 20px;max-height:60vh;overflow:auto}
+#segs div{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid #ECEAE4}
+#segs div:last-child{border-bottom:none}
+#segs time{flex:0 0 56px;font-size:13px;font-weight:600;color:#4F46E5;font-variant-numeric:tabular-nums;padding-top:3px}
+#segs span{font-size:15px;line-height:1.65;overflow-wrap:anywhere}
+.prose{gap:12px}
+.prose h3{margin:8px 0 0;font-size:15px;font-weight:600}
+.prose p{margin:0;font-size:15px;line-height:1.65;color:#3F3F46}
+.prose a,footer a{color:#3730A3}
+footer{padding:24px 32px;border-top:1px solid #E6E4DE;background:#FFF;display:flex;gap:8px 20px;flex-wrap:wrap;font-size:13px}
+dialog{border:none;border-radius:20px;width:calc(100% - 40px);max-width:520px;max-height:calc(100% - 40px);padding:32px;box-shadow:0 24px 60px rgba(23,23,26,.28);color:inherit}
+dialog[open]{display:flex;flex-direction:column;gap:22px}
+dialog::backdrop{background:rgba(23,23,26,.55)}
+dialog p{margin:0;font-size:14px;line-height:1.6;color:#3F3F46}
+.box{border:1px solid #E6E4DE;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.box.tint{background:#F1F0FE;border-color:#F1F0FE}
+.box strong{font-size:15px;font-weight:600}
+.box form{display:flex;gap:8px;flex-wrap:wrap;align-self:stretch}
+.box form input{flex:1 1 200px}
+code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflow-wrap:anywhere;user-select:all}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
+@media(max-width:600px){.actions{gap:6px}.actions .btn{min-height:40px;padding:0 10px;font-size:13px}.seg button{padding:0 11px}}
+@media(max-width:900px){aside{order:2;flex-basis:100%;border-right:none;border-top:1px solid #E6E4DE}main{padding:16px}header{padding:12px 16px}.card{padding:20px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <a class="brand" href="{{home}}">
+    <span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2"/></svg></span>
+    Transcribe
+  </a>
+  <div class="actions">
+    <a class="btn ghost" href="{{altPath}}" hreflang="{{altLang}}" lang="{{altLang}}">{{langSwitch}}</a>
+    <button class="btn" id="about">{{about}}</button>
+    <a class="btn coffee" href="{{coffee}}" target="_blank" rel="noopener noreferrer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M9 3v2M13 3v2"/></svg>
+      {{coffeeBtn}}
+    </a>
+  </div>
+</header>
+
+<div class="cols">
+  <aside>
+    <div class="eyebrow">{{library}}</div>
+    <input type="search" id="q" aria-label="{{searchLabel}}" placeholder="{{searchPh}}">
+    <div id="lib"></div>
+    <div class="note">
+      <span>{{privCard}}</span>
+      <a href="{{repo}}" target="_blank" rel="noopener noreferrer">{{privLink}}</a>
+    </div>
+  </aside>
+
+  <main>
+    <section class="card">
+      <div class="split">
+        <div>
+          <h1>{{h1}}</h1>
+          <span class="sub">{{sub}}</span>
+        </div>
+        <div>
+          <div class="muted" style="font-weight:500;margin-bottom:6px">{{language}}</div>
+          <div class="seg" role="group" aria-label="{{language}}" id="langs">
+            <button data-l="auto" aria-pressed="true">{{auto}}</button>
+            <button data-l="en" aria-pressed="false">{{english}}</button>
+            <button data-l="es" aria-pressed="false">{{spanish}}</button>
+            <button data-l="auto" data-mixed aria-pressed="false" title="{{mixedTip}}">{{mixed}}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="drop" id="drop">
+        <div class="ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg></div>
+        <strong id="dropTitle">{{dropTitle}}</strong>
+        <span class="sub" style="font-size:13px">{{dropSub}}</span>
+        <label class="btn outline" style="margin-top:6px">{{choose}}<input type="file" id="file" class="sr" accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac,.amr,.mp4"></label>
+      </div>
+
+      <div class="split" style="align-items:center">
+        <span class="sub" style="font-size:13px" id="status" role="status" aria-live="polite">{{noFile}}</span>
+        <button class="go" id="go" disabled>{{transcribe}}</button>
+      </div>
+    </section>
+
+    <section class="card" id="doc" hidden style="gap:18px">
+      <div class="split" style="align-items:center">
+        <div style="min-width:0">
+          <h2 id="docName"></h2>
+          <span class="sub" style="font-size:13px" id="docMeta"></span>
+        </div>
+        <div class="icons">
+          <button class="icon" id="copy" data-tip="{{copy}}" aria-label="{{copy}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+          </button>
+          <button class="icon" id="dl" data-tip="{{download}}" aria-label="{{download}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 11l6 6 6-6"/><path d="M4 20h16"/></svg>
+          </button>
+          <button class="icon danger" id="del" data-tip="{{del}}" aria-label="{{del}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B42318" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="segs"></div>
+    </section>
+
+    {{content}}
+  </main>
+</div>
+
+<footer>
+  {{nav}}
+  <a href="/docs">{{footDocs}}</a>
+  <a href="{{repo}}" target="_blank" rel="noopener noreferrer">{{footCode}}</a>
+</footer>
+</div>
+
+<dialog id="modal" aria-labelledby="mTitle">
+  <div class="split" style="flex-wrap:nowrap">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <h2 id="mTitle" style="font-size:22px;font-weight:700;letter-spacing:-.02em"></h2>
+      <p style="font-size:15px">{{modalBody}}</p>
+    </div>
+    <button class="icon" data-close aria-label="{{close}}" style="flex:0 0 44px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <a class="btn coffee" href="{{coffee}}" target="_blank" rel="noopener noreferrer" style="min-height:52px;border-radius:12px;font-weight:700;font-size:16px">{{coffeeBtn}}</a>
+
+  <div class="box">
+    <strong>{{ossTitle}}</strong>
+    <p>{{ossBody}}</p>
+    <a class="btn" href="{{repo}}" target="_blank" rel="noopener noreferrer">{{ossLink}}</a>
+  </div>
+
+  <div class="box">
+    <strong>{{keyTitle}}</strong>
+    <p id="keyMsg">{{keyBody}}</p>
+    <form id="claim">
+      <label for="email" class="sr">{{emailLabel}}</label>
+      <input id="email" type="email" required placeholder="you@example.com" autocomplete="email">
+      <button class="btn dark">{{keyBtn}}</button>
+    </form>
+    <code id="key" hidden></code>
+  </div>
+
+  <div class="box tint">
+    <strong style="color:#1E1B4B">{{apiTitle}}</strong>
+    <p>{{apiBody}}</p>
+    <a class="btn primary" href="/docs">{{apiBtn}}</a>
+  </div>
+
+  <button class="btn ghost" data-close style="align-self:center">{{later}}</button>
+</dialog>
+
+<script>
+const T = {{T}}, LANG = '{{lang}}', $ = s => document.querySelector(s);
+const el = (tag, props, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const clock = s => { s = Math.floor(s); const h = Math.floor(s / 3600), m = String(Math.floor(s / 60) % 60).padStart(2, '0'), ss = String(s % 60).padStart(2, '0'); return h ? `${h}:${m}:${ss}` : `${m}:${ss}`; };
+const langName = c => { try { const n = new Intl.DisplayNames([LANG], { type: 'language' }).of(c); return n[0].toUpperCase() + n.slice(1); } catch { return c; } };
+const day = t => new Date(t).toDateString() === new Date().toDateString() ? T.today : new Date(t).toLocaleDateString(LANG, { month: 'short', day: 'numeric', year: 'numeric' });
+const hour = t => new Date(t).toLocaleTimeString(LANG, { hour: 'numeric', minute: '2-digit' });
+const meta = it => `${langName(it.language)}, ${hour(it.at)}, ${clock(it.duration)}`;
+const plain = it => it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
+
+// ---- library: this browser only ----
+let items = JSON.parse(localStorage.getItem('transcripts') || '[]'), current = items[0]?.id, file = null, lang = 'auto', busy = false;
+function save() {
+  // ponytail: localStorage holds about 5 MB, so the oldest transcripts fall off when it fills. IndexedDB if people hit that.
+  for (;;) try { localStorage.setItem('transcripts', JSON.stringify(items)); return; } catch { if (items.length <= 1) return; items.pop(); }
+}
+function renderLib() {
+  const q = $('#q').value.trim().toLowerCase(), lib = $('#lib');
+  lib.replaceChildren();
+  let last;
+  for (const it of items) {
+    const d = day(it.at);
+    if (q && !(it.name + ' ' + d).toLowerCase().includes(q)) continue;
+    if (d !== last) lib.append(el('div', { className: 'day' }, last = d));
+    const b = el('button', { className: 'row', onclick: () => { current = it.id; render(); } }, el('b', {}, it.name), el('span', {}, meta(it)));
+    b.setAttribute('aria-current', it.id === current);
+    lib.append(b);
+  }
+  if (!lib.children.length) lib.append(el('div', { className: 'day' }, T.emptyLib));
+}
+function renderDoc() {
+  const it = items.find(x => x.id === current);
+  $('#doc').hidden = !it;
+  if (!it) return;
+  $('#docName').textContent = it.name;
+  $('#docMeta').textContent = `${langName(it.language)}, ${day(it.at)}, ${hour(it.at)}`;
+  $('#segs').replaceChildren(...it.segments.map(s => el('div', {}, el('time', {}, clock(s.start)), el('span', {}, s.text))));
+}
+const render = () => { renderLib(); renderDoc(); };
+$('#q').oninput = renderLib;
+
+$('#copy').onclick = async e => {
+  await navigator.clipboard.writeText(plain(items.find(x => x.id === current)));
+  const b = e.currentTarget; b.dataset.tip = T.copied; setTimeout(() => { b.dataset.tip = T.copy; }, 1800);
+};
+$('#dl').onclick = () => {
+  const it = items.find(x => x.id === current);
+  const a = el('a', { href: URL.createObjectURL(new Blob([plain(it)], { type: 'text/plain' })), download: it.name.replace(/\.[^.]+$/, '') + '.txt' });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$('#del').onclick = () => {
+  if (!confirm(T.delConfirm)) return;
+  items = items.filter(x => x.id !== current); current = items[0]?.id; save(); render();
+};
+
+// ---- new transcription ----
+const status = s => { $('#status').textContent = s; };
+const setBusy = b => { busy = b; $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+function pick(f) {
+  if (!f || busy) return;
+  if (f.size > 100 * 1024 * 1024) { file = null; status(T.tooBig); }
+  else { file = f; $('#dropTitle').textContent = f.name; status(`${(f.size / 1048576).toFixed(1)} MB`); }
+  setBusy(false);
+}
+$('#file').onchange = e => pick(e.target.files[0]);
+const drop = $('#drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); };
+$('#langs').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  lang = b.dataset.l;
+  for (const x of $('#langs').children) x.setAttribute('aria-pressed', x === b);
+};
+function fail(code, r) {
+  if (code === 401) localStorage.removeItem('apiKey');
+  status(code === 429 ? T.rateLimited.replace('{n}', r.error.match(/\d+/)[0]).replace('{m}', Math.ceil(r.retryAfter / 60)) : T.failed.replace('{e}', r.error || T.offline));
+  setBusy(false);
+}
+$('#go').onclick = () => {
+  const name = file.name, x = new XMLHttpRequest();
+  setBusy(true);
+  x.open('POST', '/api/transcribe?language=' + lang);
+  const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
+  x.upload.onprogress = e => status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100)));
+  x.onerror = () => fail(0, {});
+  x.onload = () => {
+    let r = {}; try { r = JSON.parse(x.responseText); } catch {}
+    x.status === 202 ? poll(r.id, name) : fail(x.status, r);
+  };
+  x.send(file);
+};
+async function poll(id, name) {
+  let r;
+  try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(poll, 4000, id, name); }   // a network blip is not the end
+  if (r.status === 'queued') status(T.queued.replace('{n}', r.position));
+  if (r.status === 'processing') status(T.working);
+  if (r.status === 'queued' || r.status === 'processing') return setTimeout(poll, 2000, id, name);
+  if (r.status !== 'done') return fail(0, r);
+  fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
+  items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
+  current = id; file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle;
+  save(); render(); status(T.noFile); setBusy(false);
+  openModal(T.readyTitle);
+}
+
+// ---- modal ----
+const modal = $('#modal');
+function openModal(title) { $('#mTitle').textContent = title; showKey(); modal.showModal(); }
+$('#about').onclick = () => openModal(T.aboutTitle);
+modal.onclick = e => { if (e.target === modal || e.target.closest('[data-close]')) modal.close(); };
+function showKey() {
+  const k = localStorage.getItem('apiKey');
+  $('#claim').hidden = !!k; $('#key').hidden = !k;
+  if (k) { $('#key').textContent = k; $('#keyMsg').textContent = T.keyOk; }
+}
+$('#claim').onsubmit = async e => {
+  e.preventDefault();
+  const res = await fetch('/api/claim', { method: 'POST', body: JSON.stringify({ email: $('#email').value }) });
+  const r = await res.json();
+  if (r.key) { localStorage.setItem('apiKey', r.key); showKey(); }
+  else $('#keyMsg').textContent = res.status === 404 ? T.keyNone : r.error;
+};
+
+render();
+</script>
+</body>
+</html>

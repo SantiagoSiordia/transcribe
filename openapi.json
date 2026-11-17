@@ -1,0 +1,79 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Transcribe API",
+    "version": "1.0.0",
+    "description": "Free audio transcription with a local Whisper model. No API key is needed.\n\n**How it works:** upload the audio, get a job id, poll the job until it is `done`.\n\n```\ncurl --data-binary @recording.mp3 'https://transcribe.santisiordia.com/api/transcribe?language=auto'\ncurl https://transcribe.santisiordia.com/api/jobs/JOB_ID\n```\n\n**Limits**\n\n| | Without a key | With a supporter key |\n|---|---|---|\n| Transcriptions per hour | 3 per IP address | 30 |\n| File size and length | 100 MB, 3 hours | 100 MB, 3 hours |\n| Queue | normal | goes first |\n\nSupporter keys are created automatically after a donation on Buy Me a Coffee: claim yours with `POST /api/claim` or from the About and API dialog on the site.\n\n**Privacy:** the audio is deleted as soon as its job ends, and results are dropped one hour after the job finishes (or as soon as you `DELETE` the job). The project is open source: https://github.com/SantiagoSiordia/transcribe"
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/api/transcribe": {
+      "post": {
+        "summary": "Upload audio and start a transcription",
+        "description": "Send the audio file as the raw request body (not multipart). Any common audio format works: MP3, M4A, WAV, OGG, OPUS, WEBM, FLAC, AAC. MP4 and WEBM video is accepted too; only its audio is used.",
+        "security": [{}, { "supporterKey": [] }],
+        "parameters": [
+          { "name": "language", "in": "query", "description": "Spoken language. `auto` detects it.", "schema": { "type": "string", "enum": ["auto", "en", "es"], "default": "auto" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+        "responses": {
+          "202": { "description": "Accepted. Poll `/api/jobs/{id}`.", "headers": { "X-RateLimit-Limit": { "schema": { "type": "integer" } }, "X-RateLimit-Remaining": { "schema": { "type": "integer" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" }, "example": { "id": "2f1c8a52-7c0e-4f0a-9d1b-0d6a8f3f9a11", "status": "queued", "position": 0 } } } },
+          "400": { "description": "Empty body or unknown language", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unknown API key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "413": { "description": "File larger than 100 MB", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Hourly limit reached. `Retry-After` says how many seconds to wait.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "503": { "description": "The queue is full. Try again in a few minutes.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/jobs/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "get": {
+        "summary": "Get a job's status and, when done, its transcript",
+        "description": "Poll every couple of seconds. `status` goes `queued` → `processing` → `done` or `error`.",
+        "responses": {
+          "200": { "description": "The job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" }, "example": { "id": "2f1c8a52-7c0e-4f0a-9d1b-0d6a8f3f9a11", "status": "done", "language": "en", "duration": 6, "segments": [{ "start": 0, "end": 2.72, "text": "Hello, this is a test." }], "text": "Hello, this is a test." } } } },
+          "404": { "description": "Unknown job, or its result was already dropped", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Forget a job now",
+        "description": "Removes the job and its transcript from the server's memory right away instead of after one hour. A waiting job is cancelled and its audio deleted.",
+        "responses": {
+          "200": { "description": "Forgotten" },
+          "404": { "description": "Unknown job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/claim": {
+      "post": {
+        "summary": "Get the supporter key for a donation",
+        "description": "After donating on Buy Me a Coffee, send the email you donated with. Limited to 10 attempts per hour.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email"], "properties": { "email": { "type": "string", "format": "email" } } } } } },
+        "responses": {
+          "200": { "description": "Your key. Send it as `Authorization: Bearer <key>`.", "content": { "application/json": { "example": { "key": "tr_0123abcd", "perHour": 30 } } } },
+          "404": { "description": "No donation found for that email yet", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "supporterKey": { "type": "http", "scheme": "bearer", "description": "Optional. Only supporters have one." } },
+    "schemas": {
+      "Error": { "type": "object", "properties": { "error": { "type": "string" }, "retryAfter": { "type": "integer", "description": "Seconds, on 429 only" } } },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["queued", "processing", "done", "error"] },
+          "position": { "type": "integer", "description": "Jobs ahead of this one. Only while queued." },
+          "error": { "type": "string", "description": "Only when status is error." },
+          "language": { "type": "string", "description": "Detected or requested language code. Only when done." },
+          "duration": { "type": "integer", "description": "Audio length in seconds. Only when done." },
+          "segments": { "type": "array", "items": { "type": "object", "properties": { "start": { "type": "number", "description": "seconds" }, "end": { "type": "number", "description": "seconds" }, "text": { "type": "string" } } } },
+          "text": { "type": "string", "description": "All segments, one per line." }
+        }
+      }
+    }
+  }
+}
