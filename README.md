@@ -43,7 +43,7 @@ A donation on Buy Me a Coffee creates a key automatically (webhook → `POST /ap
 
 ## Run your own
 
-Needs Node 20.6+, ffmpeg and whisper.cpp. Readable paragraphs are optional and need [Ollama](https://ollama.com) with `gemma3:4b` (`brew install ollama && brew services start ollama && ollama pull gemma3:4b`); without it the Paragraphs view just joins Whisper's text. On a Mac:
+Needs Node 20.6+, ffmpeg and whisper.cpp. Readable paragraphs are optional and need [Ollama](https://ollama.com) with `gemma3:4b` (`brew install ollama && ollama pull gemma3:4b`, then run it with `OLLAMA_NUM_PARALLEL=4 ollama serve`; `com.santi.transcribe-llm.plist` is the LaunchAgent I use); without it the Paragraphs view just joins Whisper's text. On a Mac:
 
 ```sh
 brew install ffmpeg whisper-cpp

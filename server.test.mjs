@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret', STATS_FILE: path.join(dir, 'stats.json'), ADMIN_KEY: 'adm1n' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count, pool, parts } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -57,6 +57,9 @@ assert.deepEqual(chunks([{ text: 'a'.repeat(700) }, { text: 'b'.repeat(700) }, {
 assert.deepEqual(joinParas([['One. Two', 'three'], ['four.', 'Five.'], ['Six.']]), ['One. Two', 'three four.', 'Five.', 'Six.']);
 assert.deepEqual(reflow(['Aaa. Bbb. Ccc.', 'Short one.'], 9), ['Aaa. Bbb.', 'Ccc.', 'Short one.']);   // long paragraphs split at sentence ends only
 assert.deepEqual(reflow(['no sentence end here at all'], 5), ['no sentence end here at all']);
+assert.deepEqual(await pool([30, 10, 20], async (ms, i) => { await new Promise(r => setTimeout(r, ms)); return i; }, 2), [0, 1, 2]);   // parallel, but results stay in order
+assert.deepEqual(parts('aaaa bbbb cccc', 9), ['aaaa bbbb', 'cccc']);       // cut at a space, nothing lost
+assert.deepEqual(parts('x'.repeat(25), 10).map(s => s.length), [10, 10, 5]);   // even with no space to cut at
 
 // usage: the same caller counts once a day, a new day starts a new count, and no caller id reaches the file
 const d1 = new Date('2026-01-01T10:00:00Z'), d2 = new Date('2026-01-02T10:00:00Z');

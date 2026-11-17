@@ -23,6 +23,10 @@ const REPO = env.REPO_URL || 'https://github.com/SantiagoSiordia/transcribe';
 const COFFEE = env.COFFEE_URL || 'https://buymeacoffee.com/santisiordia';
 const FFMPEG = env.FFMPEG_BIN || '/opt/homebrew/bin/ffmpeg';
 const WHISPER = env.WHISPER_BIN || '/opt/homebrew/bin/whisper-cli';
+// Engine: mlx-whisper when it is installed (Apple silicon; 1.4 to 1.9x faster here with the same words), whisper.cpp otherwise.
+const MLX = env.MLX_WHISPER_BIN || path.join(os.homedir(), 'Library/Application Support/transcribe/venv/bin/mlx_whisper');
+const MLX_MODEL = env.MLX_MODEL || 'mlx-community/whisper-large-v3-turbo';
+const USE_MLX = env.ENGINE !== 'cpp' && fs.existsSync(MLX);
 const MODEL = env.WHISPER_MODEL || path.join(os.homedir(), 'Library/Application Support/transcribe/ggml-large-v3-turbo.bin');
 const DONORS = env.DONORS_FILE || path.join(DIR, 'data/donors.json');
 const OLLAMA = env.OLLAMA_URL || 'http://127.0.0.1:11434';   // local only: transcript text never leaves this machine
@@ -109,11 +113,14 @@ let running = null, uploading = 0;
 export function enqueue(q, job) {
   q.splice(job.donor ? q.findLastIndex(j => j.donor) + 1 : q.length, 0, job);
 }
-const run = (cmd, args, timeout, onStderr, job) => new Promise((resolve, reject) => {
-  const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'], timeout });
+// HF_HUB_OFFLINE: the model is already on disk, so the engine never calls out. PATH: mlx-whisper shells out to ffmpeg.
+const CHILD_ENV = { ...env, HF_HUB_OFFLINE: '1', PYTHONUNBUFFERED: '1', PATH: `${path.dirname(FFMPEG)}:${env.PATH || '/usr/bin:/bin'}` };
+const run = (cmd, args, timeout, onOutput, job) => new Promise((resolve, reject) => {
+  const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], timeout, env: CHILD_ENV });
   if (job) job.proc = p;   // so a cancelled job can be stopped mid-run
   let err = '';
-  p.stderr.on('data', d => { err = (err + d).slice(-1500); onStderr?.(String(d)); });
+  p.stdout.on('data', d => onOutput?.(String(d)));   // read and dropped: transcript text is never logged
+  p.stderr.on('data', d => { err = (err + d).slice(-1500); onOutput?.(String(d)); });
   p.on('error', reject);
   p.on('close', code => (code === 0 ? resolve() : reject(new Error(err.trim() || `exit ${code}`))));
 });
@@ -131,7 +138,7 @@ export function eta(job, now = Date.now()) {
 // 16% of the words on a mixed English/Spanish recording, so do not turn it on without checking word counts.
 const FAST = (env.WHISPER_ARGS ?? '').split(' ').filter(Boolean);
 async function transcribe(job) {
-  const wav = job.file + '.wav', out = job.file + '.out';
+  const wav = job.file + '.wav', out = job.file + '-out';   // no dot: mlx-whisper cuts the output name at the last one
   try {
     if (!jobs.has(job.id)) throw new Error('cancelled');
     await run(FFMPEG, ['-nostdin', '-v', 'error', '-protocol_whitelist', 'file', '-format_whitelist', FORMATS,
@@ -142,16 +149,24 @@ async function transcribe(job) {
     if (seconds < 0.2) throw new Error('the file has no audio');
     if (!jobs.has(job.id)) throw new Error('cancelled');   // cancelled during conversion
     Object.assign(job, { seconds, started: Date.now(), progress: 0 });
-    await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8', ...FAST], 90 * 60e3,
-      s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); }, job)
-      .catch(e => { console.error('whisper:', e.message); throw new Error('transcription failed'); });
+    const fail = e => { console.error('whisper:', e.message); throw new Error('transcription failed'); };
+    if (USE_MLX) {
+      // progress: each printed line is "[start --> end] text"; the end time against the audio length
+      const secs = t => t.split(':').reduce((n, x) => n * 60 + Number(x), 0);
+      await run(MLX, [wav, '--model', MLX_MODEL, '--output-format', 'json', '--output-dir', path.dirname(out), '--output-name', path.basename(out),
+        '--verbose', 'True', ...(job.language === 'auto' ? [] : ['--language', job.language])], 90 * 60e3,
+        s => { for (const m of s.matchAll(/-->\s*([\d:.]+)\]/g)) job.progress = Math.min(secs(m[1]) / seconds, 0.99); }, job).catch(fail);
+    } else {
+      await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8', ...FAST], 90 * 60e3,
+        s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); }, job).catch(fail);
+    }
     // learn this machine's speed from every finished job, so the first estimate of the next one is close
     rate = 0.7 * rate + 0.3 * Math.max((Date.now() - job.started) / 1000 - LOAD, 0.1) / seconds;
     const j = JSON.parse(fs.readFileSync(out + '.json', 'utf8'));
-    const segments = j.transcription
-      .map(s => ({ start: s.offsets.from / 1000, end: s.offsets.to / 1000, text: s.text.trim() }))
+    const segments = (USE_MLX ? j.segments.map(s => ({ start: s.start, end: s.end, text: s.text.trim() }))
+      : j.transcription.map(s => ({ start: s.offsets.from / 1000, end: s.offsets.to / 1000, text: s.text.trim() })))
       .filter(s => s.text);
-    return { language: j.result?.language || job.language, duration: Math.round(seconds), segments, text: segments.map(s => s.text).join('\n') };
+    return { language: j.language || j.result?.language || job.language, duration: Math.round(seconds), segments, text: segments.map(s => s.text).join('\n') };
   } finally {
     for (const f of [job.file, wav, out + '.json']) fs.rmSync(f, { force: true });   // the audio never outlives its job
   }
@@ -195,12 +210,21 @@ export function reflow(paras, target = 450) {
 }
 let polishing = Promise.resolve();   // one cleanup at a time, alongside the transcription worker
 // One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
+// num_ctx 4096 on purpose: on this Mac the model writes about 1.6x faster than at 8192, and no call here needs more.
 async function ask(system, user) {
   const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(180e3), body: JSON.stringify({
-    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 8192 },
+    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096 },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
   if (!r.ok) throw new Error('ollama answered ' + r.status);
   return (await r.json()).message.content.trim();
+}
+// Several chunks through the model at once, results in order. Measured 2.4x faster at 4 when Ollama runs with
+// OLLAMA_NUM_PARALLEL=4 (see com.santi.transcribe-llm.plist); without that they simply wait their turn.
+const PARALLEL = Number(env.POLISH_PARALLEL || 4);
+export async function pool(items, fn, n = PARALLEL) {
+  const out = new Array(items.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); } }));
+  return out;
 }
 // One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
 async function tidy(raw) {
@@ -215,38 +239,50 @@ Write in the same language as the transcript. Use only what is said in it; do no
 Format: two or three plain sentences, then a blank line, then 3 to 6 short key points, each on its own line starting with "- ".
 No headings, no bold, no preamble. Output only the summary.`;
 const NOTES_PROMPT = `List the key points of this part of a speech transcript as short lines starting with "- ", in the same language as the transcript. Use only what is said. Output only the list.`;
+// Text is split into parts that fit the model's window (6000 characters is roughly 2000 tokens).
+export function parts(text, max = 6000) {
+  const out = [];
+  for (let rest = text; rest; ) {
+    const sp = Math.max(rest.lastIndexOf('\n', max), rest.lastIndexOf(' ', max));
+    const cut = rest.length <= max ? rest.length : sp > 0 ? sp : max;   // no space to cut at: cut hard
+    out.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+  }
+  return out;
+}
 async function summarize(job) {
-  const cs = chunks(job.result.segments, 8000);
-  if (cs.length === 1) return ask(SUMMARY_PROMPT, cs[0]);
-  const notes = [];   // long recording: notes per part, then one summary of the notes
-  for (const c of cs) { if (!jobs.has(job.id)) return undefined; notes.push(await ask(NOTES_PROMPT, c)); }
-  return ask(SUMMARY_PROMPT, notes.join('\n'));
+  let text = chunks(job.result.segments, 6000).join('\n');
+  // Long recording: notes per part, then notes of the notes, until what is left fits in one call.
+  while (text.length > 6000) {
+    if (!jobs.has(job.id)) return undefined;
+    text = (await pool(parts(text), c => ask(NOTES_PROMPT, c))).join('\n');
+  }
+  return ask(SUMMARY_PROMPT, text);
 }
 async function polish(job) {
   const p = job.polish, t0 = Date.now();
-  let kept = 0, total = 0;
+  let kept = 0, total = 0, done = 0;
   p.status = 'running';
   try {
-    const cs = p.paras ? chunks(job.result.segments) : [], parts = [];
-    for (const [i, raw] of cs.entries()) {
-      if (!jobs.has(job.id)) return;   // deleted or cancelled meanwhile
-      let ps = await tidy(raw);
-      total += raw.length;
-      if (ps) kept += raw.length;
-      else {   // a word changed somewhere: try the two halves on their own, and keep Whisper's text for whichever still fails
+    const cs = p.paras ? chunks(job.result.segments) : [];
+    const out = await pool(cs, async raw => {
+      if (!jobs.has(job.id)) return [raw];   // deleted or cancelled meanwhile: stop asking the model
+      let ps = await tidy(raw), ok = ps ? raw.length : 0;
+      if (!ps) {   // a word changed somewhere: try the two halves on their own, and keep Whisper's text for whichever still fails
         const cut = raw.indexOf(' ', raw.length >> 1);
         ps = [];
         for (const half of cut < 0 ? [raw] : [raw.slice(0, cut), raw.slice(cut + 1)]) {
           const h = cut < 0 ? null : await tidy(half);
-          if (h) kept += half.length;
+          if (h) ok += half.length;
           ps = joinParas([ps, h || [half]]);
         }
       }
-      parts.push(ps);
-      p.progress = (i + 1) / cs.length;
-    }
-    if (p.paras) p.paragraphs = reflow(joinParas(parts));   // available to the page right away, while the summary is written
-    if (p.summary && jobs.has(job.id)) p.summaryText = await summarize(job);
+      total += raw.length; kept += ok;
+      p.progress = ++done / cs.length;
+      return ps;
+    });
+    if (!jobs.has(job.id)) return;
+    if (p.paras) p.paragraphs = reflow(joinParas(out));   // available to the page right away, while the summary is written
+    if (p.summary) p.summaryText = await summarize(job);
     p.status = 'done';
     console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s` + (total ? `, model text kept for ${Math.round(100 * kept / total)}%` : ''));
   } catch (e) { console.error('polish:', e.message); p.status = 'failed'; }
@@ -498,5 +534,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }, 60e3).unref();
   // Always 127.0.0.1, never *:port. The Cloudflare tunnel is the only way in.
   const server = createServer();
-  server.listen(PORT, '127.0.0.1', () => console.log(`transcribe on http://127.0.0.1:${server.address().port}`));
+  server.listen(PORT, '127.0.0.1', () => console.log(`transcribe on http://127.0.0.1:${server.address().port} (engine: ${USE_MLX ? 'mlx-whisper' : 'whisper.cpp'})`));
 }

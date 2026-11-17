@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Ollama for Transcribe's paragraph cleanup and summaries, on 127.0.0.1:11434 only.
+  Same as `brew services start ollama`, plus OLLAMA_NUM_PARALLEL=4 so four chunks are worked on at once (2.4x faster here).
+  Use this instead of the brew service, not alongside it. Install: cp to ~/Library/LaunchAgents/ and `launchctl load` it.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.santi.transcribe-llm</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/opt/ollama/bin/ollama</string>
+    <string>serve</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/santi/Library/Logs/transcribe-llm.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/santi/Library/Logs/transcribe-llm.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/santi</string>
+    <key>OLLAMA_HOST</key>
+    <string>127.0.0.1:11434</string>
+    <key>OLLAMA_NUM_PARALLEL</key>
+    <string>4</string>
+  </dict>
+</dict>
+</plist>
