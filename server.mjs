@@ -255,7 +255,7 @@ export function createServer() {
 
       if (req.method === 'POST' && p === '/api/bmc-webhook') {
         const raw = await readBody(req, 262144);
-        if (!verifySig(raw, req.headers['x-signature-sha256'], env.BMC_WEBHOOK_SECRET)) return send(res, 401, { error: 'bad signature' });
+        if (!verifySig(raw, req.headers['x-signature-sha256'] || req.headers['x-bmc-signature'], env.BMC_WEBHOOK_SECRET)) return send(res, 401, { error: 'bad signature' });
         const ev = JSON.parse(raw);
         const email = ev.data?.supporter_email;
         if (typeof email === 'string' && email.includes('@')) /refund/i.test(ev.type || '') ? revoke(email) : grant(email);
