@@ -262,6 +262,8 @@ export function createServer() {
         return send(res, 200, { ok: true });
       }
 
+      if (['/api/transcribe', '/api/claim', '/api/bmc-webhook'].includes(p))
+        return send(res, 405, { error: 'this endpoint only accepts POST' }, 'application/json', { Allow: 'POST' });
       send(res, 404, { error: 'not found' });
     } catch (e) {
       send(res, 400, { error: e.message });

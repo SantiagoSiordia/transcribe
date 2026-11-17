@@ -74,6 +74,7 @@ const claimed = await (await post('/api/claim', JSON.stringify({ email: 'ana@exa
 assert.match(claimed.key, /^tr_/);
 assert.equal((await post('/api/claim', JSON.stringify({ email: 'nobody@example.com' }))).status, 404);
 assert.equal((await fetch(base + '/api/jobs/nope')).status, 404);
+assert.equal((await fetch(base + '/api/bmc-webhook')).status, 405);   // opened in a browser: say POST only, not "not found"
 server.close();
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('ok');
