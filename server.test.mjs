@@ -48,6 +48,14 @@ for (const [p, html] of pages) {
   assert.ok(html.includes('hreflang="es"') && html.includes('hreflang="en"'), `no hreflang pair on ${p}`);
 }
 
+// i18n: both locales define the same strings, and every translated server error still exists in the server
+const { strings } = JSON.parse(fs.readFileSync(new URL('./pages.json', import.meta.url), 'utf8'));
+const keys = l => Object.keys(strings[l]).filter(k => k !== 'errors').sort();
+assert.deepEqual(keys('es'), keys('en'));
+const src = fs.readFileSync(new URL('./server.mjs', import.meta.url), 'utf8');
+for (const e of Object.keys(strings.es.errors)) assert.ok(src.includes(`'${e}'`), `stale error translation: ${e}`);
+assert.ok(pages.get('/').includes('<html lang="en">') && pages.get('/es').includes('<html lang="es">'));
+
 // http: the trust boundary. Real server on a random port, no whisper needed for these.
 const server = createServer().listen(0, '127.0.0.1');
 await new Promise(r => server.once('listening', r));

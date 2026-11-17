@@ -110,7 +110,20 @@
       "close": "Cerrar",
       "footDocs": "Documentación de la API",
       "footCode": "Código fuente",
-      "faqTitle": "Preguntas"
+      "faqTitle": "Preguntas",
+      "errors": {
+        "could not read this file as audio": "no se pudo leer este archivo como audio",
+        "audio is longer than 3 hours": "el audio dura más de 3 horas",
+        "the file has no audio": "el archivo no tiene audio",
+        "transcription failed": "la transcripción falló",
+        "file is larger than 100 MB": "el archivo pesa más de 100 MB",
+        "send the audio file as the request body": "el archivo está vacío",
+        "the queue is full, try again in a few minutes": "la fila está llena, intenta de nuevo en unos minutos",
+        "unknown API key": "la clave de API no es válida",
+        "no such job (results are dropped one hour after they finish)": "la transcripción ya no está disponible, súbela de nuevo",
+        "too many attempts, try again later": "demasiados intentos, intenta más tarde",
+        "enter a valid email": "escribe un correo válido"
+      }
     }
   },
   "pages": [
