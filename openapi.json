@@ -3,7 +3,7 @@
   "info": {
     "title": "Transcribe API",
     "version": "1.0.0",
-    "description": "Free audio transcription with a local Whisper model. No API key is needed.\n\n**How it works:** upload the audio, get a job id, poll the job until it is `done`.\n\n```\ncurl --data-binary @recording.mp3 'https://transcribe.santisiordia.com/api/transcribe?language=auto'\ncurl https://transcribe.santisiordia.com/api/jobs/JOB_ID\n```\n\n**Limits**\n\n| | Without a key | With a supporter key |\n|---|---|---|\n| Transcriptions per hour | 3 per IP address | 30 |\n| File size and length | 100 MB, 3 hours | 100 MB, 3 hours |\n| Queue | normal | goes first |\n\nSupporter keys are created automatically after a donation on Buy Me a Coffee: claim yours with `POST /api/claim` or from the About and API dialog on the site.\n\n**Privacy:** the audio is deleted as soon as its job ends, and results are dropped one hour after the job finishes (or as soon as you `DELETE` the job). The project is open source: https://github.com/SantiagoSiordia/transcribe"
+    "description": "Free audio transcription with a local Whisper model. No API key is needed.\n\n**How it works:** upload the audio, get a job id, poll the job until it is `done`.\n\n```\ncurl --data-binary @recording.mp3 'https://transcribe.santisiordia.com/api/transcribe?language=auto'\ncurl https://transcribe.santisiordia.com/api/jobs/JOB_ID\n```\n\n**Limits**\n\n| | Without a key | With a supporter key |\n|---|---|---|\n| Transcriptions per hour | 3 per IP address | 30 |\n| File size and length | 100 MB, 3 hours | 100 MB, 3 hours |\n| Queue | normal | goes first |\n\nSupporter keys are created automatically after a donation on Buy Me a Coffee: claim yours with `POST /api/claim` or from the About and API dialog on the site.\n\n**Privacy:** the audio is deleted as soon as its job ends, and results are dropped one hour after the job finishes (or as soon as you `DELETE` the job). The project is open source: https://github.com/SantiagoSiordia/transcribe\n\n**From a browser:** the transcription endpoints send CORS headers, so a page on any site can call them directly."
   },
   "servers": [
     {
@@ -48,6 +48,14 @@
             "name": "polish",
             "in": "query",
             "description": "Add `polish=1` to also get readable paragraphs. After the job is `done`, a local language model fixes punctuation, capitalization and paragraph breaks (it cannot change words: any stretch where it does is left as Whisper wrote it). Keep polling until `polish` is `done` or `failed`, then read `paragraphs`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "description": "Add `summary=1` to also get a short summary written by a local language model once the job is `done`. Poll until `polish` is `done` or `failed`, then read `summary`. It is generated text and can contain mistakes.",
             "schema": {
               "type": "string"
             }
@@ -301,6 +309,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "description": "Add `summary=1` to also get a short summary written by a local language model once the job is `done`. Poll until `polish` is `done` or `failed`, then read `summary`. It is generated text and can contain mistakes.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -432,6 +448,10 @@
               "type": "string"
             },
             "description": "Readable paragraphs, once polish is done."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Two or three sentences, a blank line, then key points on lines starting with `- `. Only when summary=1 was requested."
           }
         }
       }

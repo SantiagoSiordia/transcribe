@@ -4,6 +4,7 @@
 //     an upload that is never started is deleted after 10 minutes (HOLD_TTL)
 //   - transcripts: in memory only, dropped RESULT_TTL after the job ends (see the sweep at the bottom)
 //   - readable paragraphs (optional, ?polish=1): made by a second local model through Ollama on 127.0.0.1, same lifetime as the transcript
+//   - data/stats.json: totals per day (users, jobs, audio minutes). Counts only; see count() for how users are counted without IPs
 //   - data/donors.json: sha256(donor email) -> API key. No plain emails, no IPs, no request logs.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -79,6 +80,25 @@ export function verifySig(raw, sig, secret) {
   const mac = crypto.createHmac('sha256', secret).update(raw).digest();
   return [mac.toString('hex'), mac.toString('base64')].some(m =>
     m.length === sig.length && crypto.timingSafeEqual(Buffer.from(m), Buffer.from(sig)));
+}
+
+// ---- usage: daily totals so the owner can see how much the service is used -------
+// "users" counts distinct callers per UTC day. To count them without keeping who they are, each caller is hashed with a
+// random salt that lives only in memory and is replaced every day; the hashes are never written anywhere.
+// ponytail: a restart forgets today's hashes, so someone active before and after a restart is counted twice that day.
+const STATS = env.STATS_FILE || path.join(DIR, 'data/stats.json');
+const stats = fs.existsSync(STATS) ? JSON.parse(fs.readFileSync(STATS, 'utf8')) : {};
+let seen = new Set(), seenDay = '', salt;
+export function count(what, n = 1, who, now = new Date()) {
+  const day = now.toISOString().slice(0, 10);
+  if (day !== seenDay) { seenDay = day; seen = new Set(); salt = crypto.randomBytes(16); }
+  const d = stats[day] ??= { users: 0, jobs: 0, done: 0, failed: 0, minutes: 0, donorJobs: 0 };
+  d[what] = Math.round((d[what] + n) * 10) / 10;
+  if (who) { const h = crypto.createHash('sha256').update(salt).update(who).digest('hex'); if (!seen.has(h)) { seen.add(h); d.users++; } }
+  fs.mkdirSync(path.dirname(STATS), { recursive: true });
+  fs.writeFileSync(STATS + '.tmp', JSON.stringify(stats, null, 1));
+  fs.renameSync(STATS + '.tmp', STATS);
+  return d;
 }
 
 // ---- queue: one job at a time, donors ahead of free jobs --------------------
@@ -172,22 +192,39 @@ export function reflow(paras, target = 450) {
 }
 let polishing = Promise.resolve();   // one cleanup at a time, alongside the transcription worker
 // One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
+async function ask(system, user) {
+  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(180e3), body: JSON.stringify({
+    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 8192 },
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
+  if (!r.ok) throw new Error('ollama answered ' + r.status);
+  return (await r.json()).message.content.trim();
+}
+// One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
 async function tidy(raw) {
   const letters = raw.replace(/[^\p{L}]/gu, '');
   const shouting = letters && letters.replace(/[^\p{Lu}]/gu, '').length / letters.length > 0.8;   // ALL CAPS in: models keep it, so hand it over lowercased
-  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(120e3), body: JSON.stringify({
-    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096 },
-    messages: [{ role: 'system', content: POLISH_PROMPT }, { role: 'user', content: shouting ? raw.toLowerCase() : raw }] }) });
-  if (!r.ok) throw new Error('ollama answered ' + r.status);
-  const out = (await r.json()).message.content.trim();
+  const out = await ask(POLISH_PROMPT, shouting ? raw.toLowerCase() : raw);
   return sameWords(out, raw) ? out.split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
+}
+// A summary is new text written by the model, so unlike the paragraphs it cannot be checked word for word. The page says so.
+const SUMMARY_PROMPT = `You summarize a speech transcript (or notes taken from one).
+Write in the same language as the transcript. Use only what is said in it; do not add facts or opinions.
+Format: two or three plain sentences, then a blank line, then 3 to 6 short key points, each on its own line starting with "- ".
+No headings, no bold, no preamble. Output only the summary.`;
+const NOTES_PROMPT = `List the key points of this part of a speech transcript as short lines starting with "- ", in the same language as the transcript. Use only what is said. Output only the list.`;
+async function summarize(job) {
+  const cs = chunks(job.result.segments, 8000);
+  if (cs.length === 1) return ask(SUMMARY_PROMPT, cs[0]);
+  const notes = [];   // long recording: notes per part, then one summary of the notes
+  for (const c of cs) { if (!jobs.has(job.id)) return undefined; notes.push(await ask(NOTES_PROMPT, c)); }
+  return ask(SUMMARY_PROMPT, notes.join('\n'));
 }
 async function polish(job) {
   const p = job.polish, t0 = Date.now();
   let kept = 0, total = 0;
   p.status = 'running';
   try {
-    const cs = chunks(job.result.segments), parts = [];
+    const cs = p.paras ? chunks(job.result.segments) : [], parts = [];
     for (const [i, raw] of cs.entries()) {
       if (!jobs.has(job.id)) return;   // deleted or cancelled meanwhile
       let ps = await tidy(raw);
@@ -205,9 +242,10 @@ async function polish(job) {
       parts.push(ps);
       p.progress = (i + 1) / cs.length;
     }
-    p.paragraphs = reflow(joinParas(parts));
+    if (p.paras) p.paragraphs = reflow(joinParas(parts));   // available to the page right away, while the summary is written
+    if (p.summary && jobs.has(job.id)) p.summaryText = await summarize(job);
     p.status = 'done';
-    console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s, model text kept for ${Math.round(100 * kept / total)}%`);
+    console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s` + (total ? `, model text kept for ${Math.round(100 * kept / total)}%` : ''));
   } catch (e) { console.error('polish:', e.message); p.status = 'failed'; }
 }
 async function pump() {
@@ -221,6 +259,7 @@ async function pump() {
   catch (e) { job.status = 'error'; job.error = e.message; }
   job.finished = Date.now();
   console.log(`job ${job.status} ${job.result?.duration ?? 0}s ${job.donor ? 'donor' : 'free'}`);   // counts only, nothing personal
+  if (job.status === 'done') { count('done'); count('minutes', job.result.duration / 60); } else count('failed');
   running = null;
   pump();
 }
@@ -286,9 +325,25 @@ const view = j => ({ id: j.id, status: j.status,
   ...(j.status === 'queued' && { position: queue.indexOf(j) + (running ? 1 : 0) }),
   ...(j.status === 'processing' && j.started != null && { progress: j.progress, eta: eta(j) }),
   ...(j.status === 'error' && { error: j.error }), ...j.result,
-  ...(j.status === 'done' && j.polish && { polish: j.polish.status, polishProgress: j.polish.progress, ...(j.polish.paragraphs && { paragraphs: j.polish.paragraphs }) }) });
-const wantsPolish = url => (url.searchParams.has('polish') && POLISH_MODEL ? { status: 'queued', progress: 0 } : undefined);
+  ...(j.status === 'done' && j.polish && { polish: j.polish.status, polishProgress: j.polish.progress, ...(j.polish.paragraphs && { paragraphs: j.polish.paragraphs }), ...(j.polish.summaryText && { summary: j.polish.summaryText }) }) });
+const wantsPolish = url => {
+  const paras = url.searchParams.has('polish'), summary = url.searchParams.has('summary');
+  return POLISH_MODEL && (paras || summary) ? { status: 'queued', progress: 0, paras, summary } : undefined;
+};
 
+function statsPage() {
+  const days = Object.keys(stats).sort().reverse(), cols = ['users', 'jobs', 'done', 'failed', 'minutes', 'donorJobs'];
+  const total = Object.fromEntries(cols.map(c => [c, Math.round(days.reduce((n, d) => n + stats[d][c], 0))]));
+  const row = (label, d) => `<tr><th>${label}</th>${cols.map(c => `<td>${d[c]}</td>`).join('')}</tr>`;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transcribe usage</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;margin:32px auto;max-width:760px;padding:0 16px;color:#17171A}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:8px 10px;border-bottom:1px solid #E6E4DE;text-align:right}th:first-child{text-align:left}thead th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#5C5B66}p{color:#5C5B66}tfoot th,tfoot td{font-weight:700;border-top:2px solid #17171A}</style>
+<h1>Transcribe usage</h1>
+<p>Right now: ${running ? 1 : 0} transcribing, ${queue.length} waiting. Supporter keys: ${Object.keys(loadDonors()).length}.</p>
+<table><thead><tr><th>Day (UTC)</th><th>Users</th><th>Jobs started</th><th>Finished</th><th>Failed or cancelled</th><th>Audio minutes</th><th>Supporter jobs</th></tr></thead>
+<tbody>${days.slice(0, 60).map(d => row(d, stats[d])).join('') || '<tr><th>No jobs yet</th></tr>'}</tbody>
+<tfoot>${row('All time', total)}</tfoot></table>
+<p>Users are distinct callers per day, counted without storing who they are, so the all-time figure adds up the days: a person who comes back on three days counts three times. Page visits are not counted here; Cloudflare's analytics has those.</p>`;
+}
 export function createServer() {
   fs.rmSync(TMP, { recursive: true, force: true });   // audio left behind by a crash goes now
   fs.mkdirSync(TMP, { recursive: true });
@@ -301,6 +356,17 @@ export function createServer() {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname.replace(/(.)\/$/, '$1');
     try {
+      // The transcription API can be called from any web page. Keys and the webhook are not opened up.
+      if (/^\/api\/(transcribe|jobs)\b/.test(p)) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After');
+        if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain', { 'Access-Control-Allow-Methods': 'GET, POST, DELETE', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '86400' });
+      }
+      if (req.method === 'GET' && p === '/stats') {   // owner only: needs ADMIN_KEY from .env, and looks like any missing page without it
+        const k = url.searchParams.get('key') || '', want = env.ADMIN_KEY || '';
+        if (!want || k.length !== want.length || !crypto.timingSafeEqual(Buffer.from(k), Buffer.from(want))) return send(res, 404, { error: 'not found' });
+        return send(res, 200, statsPage(), 'text/html', { 'X-Robots-Tag': 'noindex' });
+      }
       if (req.method === 'GET' || req.method === 'HEAD') {
         if (pages.has(p)) return send(res, 200, pages.get(p), 'text/html', cached);
         if (p === '/docs') return send(res, 200, DOCS, 'text/html', cached);
@@ -347,6 +413,7 @@ export function createServer() {
           return send(res, 202, view(job), 'application/json', rate);
         }
         enqueue(queue, job);
+        count('jobs', 1, owner); if (job.donor) count('donorJobs');
         const body = view(job);
         pump();
         return send(res, 202, body, 'application/json', rate);
@@ -365,6 +432,7 @@ export function createServer() {
           'application/json', { ...rate, 'Retry-After': lim.retryAfter });
         Object.assign(j, { status: 'queued', language, polish: wantsPolish(url) || j.polish });
         enqueue(queue, j);
+        count('jobs', 1, j.owner); if (j.donor) count('donorJobs');
         const body = view(j);
         pump();
         return send(res, 200, body, 'application/json', rate);
@@ -414,6 +482,9 @@ export function createServer() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // One odd request must not take down everyone's waiting jobs (they live in memory): log it and keep serving.
+  process.on('uncaughtException', e => console.error('uncaught:', e));
+  process.on('unhandledRejection', e => console.error('unhandled:', e));
   setInterval(() => {
     const now = Date.now();
     for (const [id, j] of jobs) {

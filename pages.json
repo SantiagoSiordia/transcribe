@@ -71,7 +71,11 @@
       "uploadingBtn": "Uploading...",
       "remove": "Remove file",
       "cancel": "Cancel",
-      "polishing": "tidying the paragraphs..."
+      "polishing": "tidying up...",
+      "viewSummary": "Summary",
+      "summarizing": "Writing the summary...",
+      "noSummary": "This transcript has no summary. New transcriptions get one.",
+      "summaryNote": "Written by an AI model from the transcript. Check anything important against the full text."
     },
     "es": {
       "about": "Acerca de y API",
@@ -157,7 +161,11 @@
       "uploadingBtn": "Subiendo...",
       "remove": "Quitar archivo",
       "cancel": "Cancelar",
-      "polishing": "puliendo los párrafos..."
+      "polishing": "puliendo...",
+      "viewSummary": "Resumen",
+      "summarizing": "Escribiendo el resumen...",
+      "noSummary": "Esta transcripción no tiene resumen. Las nuevas sí lo tendrán.",
+      "summaryNote": "Escrito por un modelo de IA a partir de la transcripción. Comprueba lo importante con el texto completo."
     }
   },
   "pages": [
@@ -352,6 +360,7 @@
           "p": [
             "Your file is uploaded to a computer I own, written to a temporary file, transcribed by a program running on that same computer, and deleted the moment the job ends, whether it worked or failed. Any leftover temporary file is also wiped each time the service starts. The upload starts when you choose the file; if you never press Transcribe, it is deleted after 10 minutes, or right away if you choose a different file.",
             "For the Paragraphs view, a second open model (Gemma) on that same computer tidies the punctuation and paragraph breaks. It is not allowed to change your words: if its version differs by a single word, it is thrown away and the original is kept. The Timestamps view is always exactly what Whisper produced.",
+            "The Summary is written by that same local model. Unlike the paragraphs it is new text, so it can miss or misstate things; treat it as a quick overview.",
             "The transcript is held in memory for up to one hour so your browser can fetch it, then it is dropped. It is never written to disk on the server. The copy you see in the Library is saved in your own browser and you can delete it there."
           ]
         },
@@ -360,6 +369,7 @@
           "p": [
             "There are no accounts, no cookies, no analytics scripts and no requests to other companies from this page; the font and every script are served from this site.",
             "To enforce the limit of 3 transcriptions per hour, the server remembers your IP address in memory for one hour. It is not written to a log. The site is delivered through Cloudflare, which carries the traffic as it does for a large part of the web.",
+            "To know how much the service is used, the server keeps daily totals: how many people used it, how many files and how many minutes of audio. People are counted without keeping who they are: your IP address is scrambled with a random value that exists only in memory and is replaced every day, and the scrambled value is never saved.",
             "If you donate and claim an API key, the server stores a one-way hash of your email next to the key, not the email itself.",
             "I am not interested in your data. The project is open source so you do not have to take my word for it: <a href=\"https://github.com/SantiagoSiordia/transcribe\">read the code</a>."
           ]
@@ -557,6 +567,7 @@
           "p": [
             "Tu archivo se sube a una computadora mía, se escribe en un archivo temporal, lo transcribe un programa en esa misma computadora, y se borra en el momento en que termina el trabajo, haya funcionado o no. Cualquier archivo temporal que quede también se elimina cada vez que el servicio arranca. La subida empieza cuando eliges el archivo; si nunca presionas Transcribir, se borra a los 10 minutos, o de inmediato si eliges otro archivo.",
             "Para la vista de Párrafos, un segundo modelo abierto (Gemma) en esa misma computadora arregla la puntuación y los saltos de párrafo. No puede cambiar tus palabras: si su versión difiere en una sola palabra, se descarta y se conserva el original. La vista con tiempos es siempre exactamente lo que produjo Whisper.",
+            "El Resumen lo escribe ese mismo modelo local. A diferencia de los párrafos es texto nuevo, así que puede omitir o describir mal algo; tómalo como un vistazo rápido.",
             "La transcripción se mantiene en memoria hasta una hora para que tu navegador pueda recogerla, y después se descarta. Nunca se escribe en disco en el servidor. La copia que ves en la Biblioteca se guarda en tu propio navegador y ahí mismo la puedes borrar."
           ]
         },
@@ -565,6 +576,7 @@
           "p": [
             "No hay cuentas, ni cookies, ni scripts de analítica, ni peticiones a otras empresas desde esta página; la tipografía y todos los scripts se sirven desde este sitio.",
             "Para aplicar el límite de 3 transcripciones por hora, el servidor recuerda tu dirección IP en memoria durante una hora. No se escribe en ningún registro. El sitio se entrega a través de Cloudflare, que transporta el tráfico como lo hace para gran parte de la web.",
+            "Para saber cuánto se usa el servicio, el servidor guarda totales diarios: cuántas personas lo usaron, cuántos archivos y cuántos minutos de audio. Las personas se cuentan sin guardar quiénes son: tu dirección IP se mezcla con un valor aleatorio que solo existe en memoria y se reemplaza cada día, y el valor mezclado nunca se guarda.",
             "Si donas y pides una clave de API, el servidor guarda un hash irreversible de tu correo junto a la clave, no el correo.",
             "No me interesan tus datos. El proyecto es de código abierto para que no tengas que creerme: <a href=\"https://github.com/SantiagoSiordia/transcribe\">lee el código</a>."
           ]

@@ -75,6 +75,17 @@ h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
 #segs p{margin:0;padding:12px 0;font-size:15px;line-height:1.75;overflow-wrap:anywhere}
 .tools{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
 .seg.sm button{min-height:36px;padding:0 12px;font-size:13px}
+/* compact picker: every option is an icon, and the chosen one opens up to show its name */
+.pick button{display:inline-flex;align-items:center;justify-content:center;min-width:40px;padding:0 11px}
+.pick button span{display:grid;grid-template-columns:0fr;transition:grid-template-columns .3s var(--ease)}
+.pick button b{min-width:0;overflow:hidden;white-space:nowrap;font-weight:500;opacity:0;transition:opacity .2s}
+.pick button b::before{content:"";display:inline-block;width:7px}
+.pick button[aria-pressed=true] span{grid-template-columns:1fr}
+.pick button[aria-pressed=true] b{opacity:1}
+.pick button[aria-pressed=true] .i{color:#4F46E5}
+#segs .li{padding:4px 0 4px 20px;position:relative}
+#segs .li::before{content:"";position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:#4F46E5}
+#segs .hint{font-size:13px;color:#5C5B66}
 #segs time{flex:0 0 56px;font-size:13px;font-weight:600;color:#4F46E5;font-variant-numeric:tabular-nums;padding-top:3px}
 #segs span{font-size:15px;line-height:1.65;overflow-wrap:anywhere}
 .prose{gap:12px}
@@ -270,9 +281,10 @@ dialog[open]::backdrop{background:rgba(23,23,26,.55)}
           <span class="sub" style="font-size:13px" id="docMeta"></span>
         </div>
         <div class="tools">
-          <div class="seg sm" role="group" aria-label="{{viewLabel}}" id="view">
-            <button data-v="stamps">{{viewStamps}}</button>
-            <button data-v="paras">{{viewParas}}</button>
+          <div class="seg sm pick" role="group" aria-label="{{viewLabel}}" id="view">
+            <button data-v="stamps" title="{{viewStamps}}"><svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>{{viewStamps}}</b></span></button>
+            <button data-v="paras" title="{{viewParas}}"><svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>{{viewParas}}</b></span></button>
+            <button data-v="summary" title="{{viewSummary}}"><svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.800 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800z"/><path d="M19 16v4M17 18h4"/></svg><span><b>{{viewSummary}}</b></span></button>
           </div>
         <div class="icons">
           <button class="icon" id="copy" data-tip="{{copy}}" aria-label="{{copy}}">
@@ -365,7 +377,7 @@ const paras = it => {
   if (cur) out.push(cur);
   return out;
 };
-const plain = it => view === 'paras' ? paras(it).join('\n\n') : it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
+const plain = it => view === 'summary' ? (it.summary || '') : view === 'paras' ? paras(it).join('\n\n') : it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
 
 // ---- library: this browser only ----
 let items = JSON.parse(localStorage.getItem('transcripts') || '[]'), current = items[0]?.id, file = null, lang = 'auto', busy = false, fresh = null;
@@ -395,6 +407,14 @@ function renderDoc() {
   $('#docName').textContent = it.name;
   $('#docMeta').textContent = `${langName(it.language)}, ${day(it.at)}, ${hour(it.at)}` + (it.polish ? ` · ${T.polishing}` : '');
   for (const b of $('#view').children) b.setAttribute('aria-pressed', b.dataset.v === view);
+  if (view === 'summary') {
+    const lines = (it.summary || '').replace(/\*\*/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+    const note = el('p', { className: 'hint' }, it.summary ? T.summaryNote : it.polish ? T.summarizing : T.noSummary);
+    return $('#segs').replaceChildren(...lines.map((l, i) => {
+      const p = el('p', { className: (/^[-*•]\s/.test(l) ? 'li ' : '') + 'in' }, l.replace(/^[-*•]\s+/, ''));
+      p.style.setProperty('--i', i); return p;
+    }), note);
+  }
   $('#segs').replaceChildren(...(view === 'paras' ? paras(it) : it.segments).map((s, i) => {
     const d = view === 'paras' ? el('p', {}, s) : el('div', {}, el('time', {}, clock(s.start)), el('span', {}, s.text));
     if (i < 16) { d.className = 'in'; d.style.setProperty('--i', i); }   // only the first screenful staggers; a 3-hour transcript must not start 3,000 animations
@@ -479,7 +499,7 @@ async function start() {
   const { id } = up, name = file.name;
   bar(null); status(T.working);
   let res, r = {};
-  try { res = await fetch(`/api/jobs/${id}/start?language=${lang}&polish=1`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
+  try { res = await fetch(`/api/jobs/${id}/start?language=${lang}&polish=1&summary=1`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
   if (res.status === 404) return upload(true);   // it waited over 10 minutes and the server deleted it: send it again, then start
   if (!res.ok) return fail(res.status, r);
   if (!busy) return void fetch('/api/jobs/' + id, { method: 'DELETE' });   // cancelled while the start request was in flight
@@ -538,7 +558,7 @@ async function follow(id, name) {
   }
   const tidying = r.polish === 'queued' || r.polish === 'running';
   if (!tidying) fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
-  if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments, paragraphs: r.paragraphs, polish: tidying || undefined });
+  if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments, paragraphs: r.paragraphs, summary: r.summary, polish: tidying || undefined });
   if (tidying) setTimeout(tidy, 3000, id);
   localStorage.removeItem('pending');
   if (active !== id) return;   // cancelled while the last request was in flight
@@ -553,11 +573,16 @@ async function tidy(id) {
   if (!it || !it.polish) return;
   let r;
   try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(tidy, 6000, id); }
-  if (r.polish === 'queued' || r.polish === 'running') return setTimeout(tidy, 3000, id);
-  delete it.polish;                                    // done, failed, or the server no longer has it: stop waiting either way
-  if (r.paragraphs) it.paragraphs = r.paragraphs;
-  if (r.id) fetch('/api/jobs/' + id, { method: 'DELETE' });
-  save(); if (current === id) renderDoc();
+  const more = r.polish === 'queued' || r.polish === 'running';
+  const news = (r.paragraphs && !it.paragraphs) || (r.summary && !it.summary) || !more;
+  if (r.paragraphs) it.paragraphs = r.paragraphs;      // paragraphs land first, the summary a little after
+  if (r.summary) it.summary = r.summary;
+  if (!more) {                                         // done, failed, or the server no longer has it: stop waiting either way
+    delete it.polish;
+    if (r.id) fetch('/api/jobs/' + id, { method: 'DELETE' });
+  }
+  if (news) { save(); if (current === id) renderDoc(); }
+  if (more) setTimeout(tidy, 3000, id);
 }
 
 // ---- modal ----

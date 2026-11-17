@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
-Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow } = await import('./server.mjs');
+Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret', STATS_FILE: path.join(dir, 'stats.json'), ADMIN_KEY: 'adm1n' });
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -58,6 +58,13 @@ assert.deepEqual(joinParas([['One. Two', 'three'], ['four.', 'Five.'], ['Six.']]
 assert.deepEqual(reflow(['Aaa. Bbb. Ccc.', 'Short one.'], 9), ['Aaa. Bbb.', 'Ccc.', 'Short one.']);   // long paragraphs split at sentence ends only
 assert.deepEqual(reflow(['no sentence end here at all'], 5), ['no sentence end here at all']);
 
+// usage: the same caller counts once a day, a new day starts a new count, and no caller id reaches the file
+const d1 = new Date('2026-01-01T10:00:00Z'), d2 = new Date('2026-01-02T10:00:00Z');
+count('jobs', 1, '203.0.113.7', d1); count('jobs', 1, '203.0.113.7', d1);
+assert.deepEqual([count('jobs', 1, '198.51.100.2', d1).users, count('jobs', 0, undefined, d1).jobs], [2, 3]);
+assert.equal(count('jobs', 1, '203.0.113.7', d2).users, 1);
+assert.ok(!fs.readFileSync(process.env.STATS_FILE, 'utf8').includes('203.0.113'));
+
 // pages: every page renders with no placeholder left, and each has its language pair
 const pages = buildPages();
 assert.ok(pages.size >= 12);
@@ -104,7 +111,13 @@ assert.equal(started.status, 200);
 assert.ok(['queued', 'processing'].includes((await started.json()).status));
 assert.equal((await post(`/api/jobs/${h2.id}/start`, '')).status, 409);
 assert.equal((await post('/api/jobs/nope/start', '')).status, 404);
-assert.equal((await fetch(base + '/api/bmc-webhook')).status, 405);   // opened in a browser: say POST only, not "not found"
+assert.equal((await fetch(base + '/api/bmc-webhook')).status, 405);
+assert.equal((await fetch(base + '/stats')).status, 404);                        // owner page is invisible without the key
+assert.equal((await fetch(base + '/stats?key=wrong')).status, 404);
+assert.match(await (await fetch(base + '/stats?key=adm1n')).text(), /Transcribe usage/);
+const pre = await fetch(base + '/api/transcribe', { method: 'OPTIONS' });          // other sites' pages may call the API
+assert.equal(pre.status, 204); assert.equal(pre.headers.get('access-control-allow-origin'), '*');
+assert.equal((await fetch(base + '/api/claim', { method: 'OPTIONS' })).headers.get('access-control-allow-origin'), null);   // opened in a browser: say POST only, not "not found"
 server.close();
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('ok');

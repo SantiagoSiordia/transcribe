@@ -16,6 +16,8 @@ The whole server is one file, [`server.mjs`](server.mjs), with no dependencies.
 | Your audio | A temp file | The moment its job ends, success or failure; after 10 minutes if you chose a file but never pressed Transcribe; also wiped at every start | `transcribe()`, its `finally` block, and the first lines of `createServer()` |
 | The transcript | Server memory, never disk | One hour after the job ends, or immediately when the page fetches it and sends `DELETE` | the sweep at the bottom, `DELETE /api/jobs/{id}` |
 | Readable paragraphs | Made by a second local model (Gemma via Ollama on `127.0.0.1`), held in server memory with the transcript | Same as the transcript | `polish()`; `sameWords()` rejects any output that changes a word |
+| Summary | Written by the same local model; new text, so it is labelled as AI-written | Same as the transcript | `summarize()` |
+| Usage totals | `data/stats.json`: per day, how many callers, files and audio minutes. No IPs: callers are counted through a hash salted with a random value that is only in memory and changes daily | Kept | `count()` |
 | Your IP address | Server memory, for the hourly limit | One hour | `limiter()` |
 | Donor email | Only as a SHA-256 hash, next to the key | When a donation is refunded | `grant()`, `revoke()` |
 | Your library | Your browser's `localStorage` | When you delete it | `index.html` |
