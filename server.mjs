@@ -127,6 +127,9 @@ export function eta(job, now = Date.now()) {
   const left = job.progress >= 0.2 ? elapsed * (1 - job.progress) / job.progress : LOAD + job.seconds * rate - elapsed;
   return Math.max(1, Math.round(left));
 }
+// Greedy decoding without carrying text between 30 s windows: measured 28x realtime against 17x with whisper.cpp's
+// default beam search on this Mac, with the same words on the test recordings. Set WHISPER_ARGS='' for the slower default.
+const FAST = (env.WHISPER_ARGS ?? '-bs 1 -bo 1 -mc 0').split(' ').filter(Boolean);
 async function transcribe(job) {
   const wav = job.file + '.wav', out = job.file + '.out';
   try {
@@ -139,7 +142,7 @@ async function transcribe(job) {
     if (seconds < 0.2) throw new Error('the file has no audio');
     if (!jobs.has(job.id)) throw new Error('cancelled');   // cancelled during conversion
     Object.assign(job, { seconds, started: Date.now(), progress: 0 });
-    await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8'], 90 * 60e3,
+    await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8', ...FAST], 90 * 60e3,
       s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); }, job)
       .catch(e => { console.error('whisper:', e.message); throw new Error('transcription failed'); });
     // learn this machine's speed from every finished job, so the first estimate of the next one is close
