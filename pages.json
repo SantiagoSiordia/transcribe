@@ -23,7 +23,7 @@
       "transcribing": "Transcribing...",
       "uploading": "Uploading, {p}%",
       "queued": "In line, {n} ahead of you. Keep this tab open.",
-      "working": "Working on it. Keep this tab open.",
+      "working": "Getting ready.",
       "tooBig": "That file is larger than 100 MB.",
       "failed": "That did not work: {e}",
       "offline": "could not reach the server",
@@ -60,7 +60,10 @@
       "chipDeleted": "Audio deleted after",
       "chipOpen": "Open source",
       "madeBy": "Built by Santi Siordia",
-      "footNav": "More"
+      "footNav": "More",
+      "progress": "Transcribing, {p}%.",
+      "eta": "About {m} min left.",
+      "etaSoon": "Less than a minute left."
     },
     "es": {
       "about": "Acerca de y API",
@@ -85,7 +88,7 @@
       "transcribing": "Transcribiendo...",
       "uploading": "Subiendo, {p}%",
       "queued": "En fila, {n} antes que tú. Deja esta pestaña abierta.",
-      "working": "Trabajando en ello. Deja esta pestaña abierta.",
+      "working": "Preparando.",
       "tooBig": "Ese archivo pesa más de 100 MB.",
       "failed": "No funcionó: {e}",
       "offline": "no se pudo conectar con el servidor",
@@ -135,7 +138,10 @@
       "chipDeleted": "El audio se borra al terminar",
       "chipOpen": "Código abierto",
       "madeBy": "Hecho por Santi Siordia",
-      "footNav": "Más"
+      "footNav": "Más",
+      "progress": "Transcribiendo, {p}%.",
+      "eta": "Faltan unos {m} min.",
+      "etaSoon": "Falta menos de un minuto."
     }
   },
   "pages": [

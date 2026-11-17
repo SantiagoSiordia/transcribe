@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -39,6 +39,12 @@ assert.equal(claim('ana@example.com'), null);
 const q = [];
 for (const [id, donor] of [['f1', false], ['d1', true], ['f2', false], ['d2', true]]) enqueue(q, { id, donor });
 assert.deepEqual(q.map(j => j.id), ['d1', 'd2', 'f1', 'f2']);
+
+// time left: a guess from audio length at first, then the job's real pace
+assert.equal(eta({}), undefined);                                             // still converting: no estimate yet
+assert.equal(eta({ started: 0, seconds: 600, progress: 0 }, 0), 27);         // 3 s load + 600 s * 0.04
+assert.equal(eta({ started: 0, seconds: 600, progress: 0.25 }, 10e3), 30);   // 25% took 10 s, so 30 s to go
+assert.equal(eta({ started: 0, seconds: 5, progress: 0 }, 60e3), 1);         // never zero or negative while still running
 
 // pages: every page renders with no placeholder left, and each has its language pair
 const pages = buildPages();

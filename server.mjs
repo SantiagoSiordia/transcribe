@@ -82,13 +82,23 @@ let running = null, uploading = 0;
 export function enqueue(q, job) {
   q.splice(job.donor ? q.findLastIndex(j => j.donor) + 1 : q.length, 0, job);
 }
-const run = (cmd, args, timeout) => new Promise((resolve, reject) => {
+const run = (cmd, args, timeout, onStderr) => new Promise((resolve, reject) => {
   const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'], timeout });
   let err = '';
-  p.stderr.on('data', d => { err = (err + d).slice(-1500); });
+  p.stderr.on('data', d => { err = (err + d).slice(-1500); onStderr?.(String(d)); });
   p.on('error', reject);
   p.on('close', code => (code === 0 ? resolve() : reject(new Error(err.trim() || `exit ${code}`))));
 });
+// Time left, in seconds. Before whisper has reported much, guess from the audio length and the measured speed;
+// after that, trust the real pace of this job.
+const LOAD = 3;      // seconds to load the model
+let rate = 0.04;     // processing seconds per second of audio; a starting guess that is corrected after each job
+export function eta(job, now = Date.now()) {
+  if (job.started == null) return undefined;
+  const elapsed = (now - job.started) / 1000;
+  const left = job.progress >= 0.2 ? elapsed * (1 - job.progress) / job.progress : LOAD + job.seconds * rate - elapsed;
+  return Math.max(1, Math.round(left));
+}
 async function transcribe(job) {
   const wav = job.file + '.wav', out = job.file + '.out';
   try {
@@ -98,8 +108,12 @@ async function transcribe(job) {
     const seconds = (fs.statSync(wav).size - 44) / 32000;   // 16 kHz, mono, 16-bit
     if (seconds > MAX_SECONDS) throw new Error('audio is longer than 3 hours');
     if (seconds < 0.2) throw new Error('the file has no audio');
-    await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-t', '8'], 90 * 60e3)
+    Object.assign(job, { seconds, started: Date.now(), progress: 0 });
+    await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8'], 90 * 60e3,
+      s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); })
       .catch(e => { console.error('whisper:', e.message); throw new Error('transcription failed'); });
+    // learn this machine's speed from every finished job, so the first estimate of the next one is close
+    rate = 0.7 * rate + 0.3 * Math.max((Date.now() - job.started) / 1000 - LOAD, 0.1) / seconds;
     const j = JSON.parse(fs.readFileSync(out + '.json', 'utf8'));
     const segments = j.transcription
       .map(s => ({ start: s.offsets.from / 1000, end: s.offsets.to / 1000, text: s.text.trim() }))
@@ -180,6 +194,7 @@ const readBody = (req, max = 65536) => new Promise((resolve, reject) => {
 const ip = req => req.headers['cf-connecting-ip'] || req.socket.remoteAddress;
 const view = j => ({ id: j.id, status: j.status,
   ...(j.status === 'queued' && { position: queue.indexOf(j) + (running ? 1 : 0) }),
+  ...(j.status === 'processing' && j.started != null && { progress: j.progress, eta: eta(j) }),
   ...(j.status === 'error' && { error: j.error }), ...j.result });
 
 export function createServer() {

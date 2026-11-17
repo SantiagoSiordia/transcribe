@@ -126,6 +126,8 @@ input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,22
 @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 #status,#segs time,.row span,code{font-family:var(--mono)}
 #status{font-size:12.5px}
+.busy #dropSub{font-family:var(--mono);color:#3730A3}
+.bar{height:6px;border-radius:3px}
 .busy #status::after{content:"\258D";margin-left:3px;color:#4F46E5;animation:blink 1s steps(2,jump-none) infinite}
 @keyframes blink{to{opacity:0}}
 /* a transcript arriving: the card settles in, its first lines follow one after another, its library row lights up */
@@ -235,7 +237,7 @@ dialog[open]::backdrop{background:rgba(23,23,26,.55)}
         <div class="ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg><span class="eq"><i></i><i></i><i></i><i></i><i></i></span></div>
         <strong id="dropTitle">{{dropTitle}}</strong>
         <div class="bar" id="bar" aria-hidden="true"><i></i></div>
-        <span class="sub" style="font-size:13px">{{dropSub}}</span>
+        <span class="sub" style="font-size:13px" id="dropSub">{{dropSub}}</span>
         <label class="btn outline" style="margin-top:6px">{{choose}}<input type="file" id="file" class="sr" accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac,.amr,.mp4"></label>
       </div>
 
@@ -388,9 +390,9 @@ $('#del').onclick = () => {
 };
 
 // ---- new transcription ----
-const status = s => { $('#status').textContent = s; };
+const status = s => { $('#status').textContent = s; $('#dropSub').textContent = busy ? s : T.dropSub; };
 const bar = p => { $('#bar').classList.toggle('scan', p == null); $('#bar').style.setProperty('--p', p ?? 0); };   // a fraction while uploading, null = working, length unknown
-const setBusy = b => { busy = b; document.body.classList.toggle('busy', b); bar(0); $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+const setBusy = b => { busy = b; document.body.classList.toggle('busy', b); bar(0); if (!b) $('#dropSub').textContent = T.dropSub; $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
 function pick(f) {
   if (!f || busy) return;
   if (f.size > 100 * 1024 * 1024) { file = null; status(T.tooBig); }
@@ -416,6 +418,7 @@ function thumb() {
 thumb(); addEventListener('resize', thumb); document.fonts.ready.then(thumb);
 requestAnimationFrame(() => requestAnimationFrame(() => $('#langs').classList.add('ready')));   // after the first paint, so the thumb does not slide in from nowhere
 function fail(code, r) {
+  localStorage.removeItem('pending'); onbeforeunload = null;
   if (code === 401) localStorage.removeItem('apiKey');
   status(code === 429 ? T.rateLimited.replace('{n}', r.error.match(/\d+/)[0]).replace('{m}', Math.ceil(r.retryAfter / 60)) : T.failed.replace('{e}', tr(r.error) || T.offline));
   setBusy(false);
@@ -423,13 +426,17 @@ function fail(code, r) {
 $('#go').onclick = () => {
   const name = file.name, x = new XMLHttpRequest();
   setBusy(true);
+  onbeforeunload = e => e.preventDefault();   // leaving mid-upload loses the upload, so the browser asks first
   x.open('POST', '/api/transcribe?language=' + lang);
   const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
   x.upload.onprogress = e => { bar(e.loaded / e.total); status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100))); };
   x.onerror = () => fail(0, {});
   x.onload = () => {
     let r = {}; try { r = JSON.parse(x.responseText); } catch {}
-    x.status === 202 ? poll(r.id, name) : fail(x.status, r);
+    if (x.status !== 202) return fail(x.status, r);
+    onbeforeunload = null;
+    localStorage.setItem('pending', JSON.stringify({ id: r.id, name }));   // from here a reload picks the job back up
+    poll(r.id, name);
   };
   x.send(file);
 };
@@ -437,11 +444,19 @@ async function poll(id, name) {
   let r;
   try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(poll, 4000, id, name); }   // a network blip is not the end
   if (r.status === 'queued') status(T.queued.replace('{n}', r.position));
-  if (r.status === 'processing') status(T.working);
-  if (r.status === 'queued' || r.status === 'processing') { bar(null); return setTimeout(poll, 2000, id, name); }
-  if (r.status !== 'done') return fail(0, r);
+  if (r.status === 'processing') {
+    const left = r.eta == null ? '' : ' ' + (r.eta < 60 ? T.etaSoon : T.eta.replace('{m}', Math.round(r.eta / 60)));
+    status(r.progress ? T.progress.replace('{p}', Math.round(r.progress * 100)) + left : T.working + left);
+  }
+  if (r.status === 'queued' || r.status === 'processing') { bar(r.progress || null); return setTimeout(poll, r.status === 'queued' ? 2000 : 1000, id, name); }
+  if (r.status !== 'done') {
+    const saved = JSON.parse(localStorage.getItem('transcripts') || '[]');   // another tab may have collected it already
+    if (!saved.some(x => x.id === id)) return fail(0, r);
+    items = saved;
+  }
   fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
-  items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
+  if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
+  localStorage.removeItem('pending');
   current = fresh = id; file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle; drop.classList.remove('has');
   save(); render(); fresh = null; status(T.noFile); setBusy(false);
   $('#doc').scrollIntoView({ block: 'nearest' });
@@ -467,6 +482,8 @@ $('#claim').onsubmit = async e => {
 };
 
 render();
+const pending = JSON.parse(localStorage.getItem('pending') || 'null');   // reloaded mid-job: carry on where it was
+if (pending) { setBusy(true); $('#dropTitle').textContent = pending.name; drop.classList.add('has'); status(T.working); poll(pending.id, pending.name); }
 </script>
 </body>
 </html>
