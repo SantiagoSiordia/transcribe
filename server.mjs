@@ -180,10 +180,23 @@ const POLISH_PROMPT = `You fix the punctuation, capitalization and paragraph bre
 Rules:
 - Keep every word exactly as it is, in the same order. Do not add, remove, translate, correct or replace any word.
 - You may only change: punctuation marks, upper/lower case, and where paragraphs break (use a blank line).
+- The one exception: when the same word is said two or more times in a row by accident (a stutter, like "de de de cosas"), keep it once.
 - Keep the language of the transcript.
 - Output only the transcript text, nothing else.`;
-// The guarantee: identical once case, punctuation and spacing are ignored. A model that changes a word is not trusted.
-export const sameWords = (a, b) => { const n = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''); return n(a) === n(b); };
+// The guarantee: the same words in the same order once case and punctuation are ignored, except that a word said
+// twice in a row may be kept once. A model that changes anything else is not trusted.
+export const sameWords = (a, b) => {
+  const n = s => (s.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((w, i, all) => w !== all[i - 1]).join(' ');
+  return n(a) === n(b);
+};
+// "de de de cosas" -> "de cosas". Letters only, so repeated digits (a phone number) are left alone.
+export const unstutter = t => t.replace(/(?<![\p{L}\p{N}])(\p{L}+)(?:[\s,]+\1)+(?![\p{L}\p{N}])/giu, '$1');
+// Whisper starts every short segment with a capital, mid-sentence or not. Where the previous segment did not end a
+// sentence, the next one starts lower case (an acronym, or English "I", keeps its capital).
+export const calm = segments => segments.map((s, i) => {
+  const prev = segments[i - 1]?.text.trim();
+  return !prev || /[.?!…]$/.test(prev) || /^(\p{Lu}{2}|I\b)/u.test(s.text) ? s : { ...s, text: s.text[0].toLowerCase() + s.text.slice(1) };
+});
 export function chunks(segments, max = 1200) {
   const out = []; let cur = '';
   for (const s of segments) {
@@ -215,9 +228,11 @@ export function reflow(paras, target = 450) {
 let polishing = Promise.resolve();   // one cleanup at a time, alongside the transcription worker
 // One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
 // num_ctx 4096 on purpose: on this Mac the model writes about 1.6x faster than at 8192, and no call here needs more.
-async function ask(system, user) {
-  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(180e3), body: JSON.stringify({
-    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096 },
+// maxTokens matters: left alone, the model sometimes keeps writing (it was seen producing 1,800 tokens for a passage
+// that needs 350), which held up every paragraph and the summary behind it. A cut-off answer simply fails the word check.
+async function ask(system, user, maxTokens) {
+  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(90e3), body: JSON.stringify({
+    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096, num_predict: maxTokens },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
   if (!r.ok) throw new Error('ollama answered ' + r.status);
   return (await r.json()).message.content.trim();
@@ -234,8 +249,8 @@ export async function pool(items, fn, n = PARALLEL) {
 async function tidy(raw) {
   const letters = raw.replace(/[^\p{L}]/gu, '');
   const shouting = letters && letters.replace(/[^\p{Lu}]/gu, '').length / letters.length > 0.8;   // ALL CAPS in: models keep it, so hand it over lowercased
-  const out = await ask(POLISH_PROMPT, shouting ? raw.toLowerCase() : raw);
-  return sameWords(out, raw) ? out.split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
+  const out = await ask(POLISH_PROMPT, shouting ? raw.toLowerCase() : raw, Math.ceil(raw.length / 2) + 60);   // about 1.5x what the same text needs
+  return sameWords(out, raw) ? unstutter(out).split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
 }
 // A summary is new text written by the model, so unlike the paragraphs it cannot be checked word for word. The page says so.
 const SUMMARY_PROMPT = `You summarize a speech transcript (or notes taken from one).
@@ -258,9 +273,9 @@ async function summarize(job) {
   // Long recording: notes per part, then notes of the notes, until what is left fits in one call.
   while (text.length > 6000) {
     if (!jobs.has(job.id)) return undefined;
-    text = (await pool(parts(text), c => ask(NOTES_PROMPT, c))).join('\n');
+    text = (await pool(parts(text), c => ask(NOTES_PROMPT, c, 350))).join('\n');
   }
-  return ask(SUMMARY_PROMPT, text);
+  return ask(SUMMARY_PROMPT, text, 450);
 }
 async function polish(job) {
   const p = job.polish, t0 = Date.now();
@@ -268,16 +283,17 @@ async function polish(job) {
   p.status = 'running';
   try {
     const cs = p.paras ? chunks(job.result.segments) : [];
-    const out = await pool(cs, async raw => {
+    const plain = chunks(calm(job.result.segments));   // same cuts (only case differs): what is shown where the model's version is rejected
+    const out = await pool(cs, async (raw, n) => {
       if (!jobs.has(job.id)) return [raw];   // deleted or cancelled meanwhile: stop asking the model
       let ps = await tidy(raw), ok = ps ? raw.length : 0;
       if (!ps) {   // a word changed somewhere: try the two halves on their own, and keep Whisper's text for whichever still fails
         const cut = raw.indexOf(' ', raw.length >> 1);
         ps = [];
-        for (const half of cut < 0 ? [raw] : [raw.slice(0, cut), raw.slice(cut + 1)]) {
-          const h = cut < 0 ? null : await tidy(half);
+        for (const [from, to] of cut < 0 ? [[0, raw.length]] : [[0, cut], [cut + 1, raw.length]]) {
+          const half = raw.slice(from, to), h = cut < 0 ? null : await tidy(half);
           if (h) ok += half.length;
-          ps = joinParas([ps, h || [half]]);
+          ps = joinParas([ps, h || [unstutter(plain[n].slice(from, to))]]);
         }
       }
       total += raw.length; kept += ok;

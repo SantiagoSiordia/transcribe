@@ -86,6 +86,14 @@ h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
 #segs .li{padding:4px 0 4px 20px;position:relative}
 #segs .li::before{content:"";position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:#4F46E5}
 #segs .hint{font-size:13px;color:#5C5B66}
+#segs .wait{display:flex;align-items:center;gap:12px;padding:14px 0 10px;font-size:14px;font-weight:600;color:#3730A3}
+.wait .eq{color:#4F46E5;height:20px}
+.wait .eq i{animation:eq var(--t) ease-in-out var(--d) infinite alternate}
+#segs .sk{height:12px;padding:0;margin:12px 0;border-radius:6px;background:linear-gradient(90deg,#ECEAE4 0%,#ECEAE4 35%,#F7F6F2 50%,#ECEAE4 65%,#ECEAE4 100%);background-size:300% 100%;animation:shimmer 1.6s linear infinite}
+#segs .sk.li{margin-left:20px}
+#segs .sk.li::before{top:3px}
+#segs .sk.gap{margin-top:26px}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
 #segs time{flex:0 0 56px;font-size:13px;font-weight:600;color:#4F46E5;font-variant-numeric:tabular-nums;padding-top:3px}
 #segs span{font-size:15px;line-height:1.65;overflow-wrap:anywhere}
 .prose{gap:12px}
@@ -369,13 +377,16 @@ let view = localStorage.getItem('view') || 'stamps';
 // Paragraphs: a new one starts after a pause of 2 s, or at a sentence end once the paragraph is long enough.
 const paras = it => {
   if (it.paragraphs) return it.paragraphs;   // the tidied version, when the server made one
+  // No tidied version (older transcript, or the cleanup is still running): at least undo Whisper's habit of starting
+  // every short segment with a capital, and drop words stuttered twice in a row. Same rules as calm()/unstutter() in server.mjs.
   const out = []; let cur = '', prev;
   for (const s of it.segments) {
     if (cur && (s.start - prev.end > 2 || (cur.length > 400 && /[.?!…]$/.test(cur)))) { out.push(cur); cur = ''; }
-    cur += (cur ? ' ' : '') + s.text; prev = s;
+    const mid = cur && !/[.?!…]$/.test(cur) && !/^(\p{Lu}{2}|I\b)/u.test(s.text);
+    cur += (cur ? ' ' : '') + (mid ? s.text[0].toLowerCase() + s.text.slice(1) : s.text); prev = s;
   }
   if (cur) out.push(cur);
-  return out;
+  return out.map(p => p.replace(/(?<![\p{L}\p{N}])(\p{L}+)(?:[\s,]+\1)+(?![\p{L}\p{N}])/giu, '$1'));
 };
 const plain = it => view === 'summary' ? (it.summary || '') : view === 'paras' ? paras(it).join('\n\n') : it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
 
@@ -409,7 +420,13 @@ function renderDoc() {
   for (const b of $('#view').children) b.setAttribute('aria-pressed', b.dataset.v === view);
   if (view === 'summary') {
     const lines = (it.summary || '').replace(/\*\*/g, '').split('\n').map(l => l.trim()).filter(Boolean);
-    const note = el('p', { className: 'hint' }, it.summary ? T.summaryNote : it.polish ? T.summarizing : T.noSummary);
+    if (!it.summary && it.polish) {   // being written: a live waveform, the label, and the shape of what is coming
+      const eq = el('span', { className: 'eq' }, ...[1, 2, 3, 4, 5].map(() => el('i')));
+      const bar = (w, cls = '') => { const b = el('p', { className: 'sk ' + cls }); b.style.width = w; return b; };
+      return $('#segs').replaceChildren(el('p', { className: 'wait' }, eq, T.summarizing),
+        bar('94%'), bar('88%'), bar('61%'), bar('46%', 'li gap'), bar('58%', 'li'), bar('39%', 'li'), bar('52%', 'li'));
+    }
+    const note = el('p', { className: 'hint' }, it.summary ? T.summaryNote : T.noSummary);
     return $('#segs').replaceChildren(...lines.map((l, i) => {
       const p = el('p', { className: (/^[-*•]\s/.test(l) ? 'li ' : '') + 'in' }, l.replace(/^[-*•]\s+/, ''));
       p.style.setProperty('--i', i); return p;

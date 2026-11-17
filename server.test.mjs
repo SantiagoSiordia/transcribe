@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret', STATS_FILE: path.join(dir, 'stats.json'), ADMIN_KEY: 'adm1n' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow, count, pool, parts, parseEngineJson } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, unstutter, calm, chunks, joinParas, reflow, count, pool, parts, parseEngineJson } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -53,6 +53,12 @@ assert.equal(sameWords('so yesterday i was there and she said yes', 'So, yesterd
 assert.equal(sameWords('let us move on', "Let's move on."), false);           // a contraction is a changed word
 assert.equal(sameWords('it cost $40,000', 'It cost $40,000.'), true);
 assert.equal(sameWords('fuimos a méxico', 'Fuimos a Mexico.'), false);         // so is a dropped accent
+assert.equal(sameWords('esa secuencia De De De cosas', 'Esa secuencia de cosas.'), true);    // a stutter may go
+assert.equal(sameWords('esa secuencia de cosas pues', 'Esa secuencia de cosas.'), false);    // a filler word may not
+assert.equal(sameWords('one two three', 'One three two.'), false);
+assert.equal(unstutter('Antes de De comenzar, esa secuencia de de de cosas. No, no. Call 5 5 5 now'), 'Antes de comenzar, esa secuencia de cosas. No. Call 5 5 5 now');
+assert.deepEqual(calm([{ text: 'Lo que me gustaría' }, { text: 'Es darle.' }, { text: 'Pero no' }, { text: 'I think' }, { text: 'NASA dijo' }, { text: 'Y ya' }]).map(s => s.text),
+  ['Lo que me gustaría', 'es darle.', 'Pero no', 'I think', 'NASA dijo', 'y ya']);
 assert.deepEqual(chunks([{ text: 'a'.repeat(700) }, { text: 'b'.repeat(700) }, { text: 'c' }]).map(c => c.length), [700, 702]);
 assert.deepEqual(joinParas([['One. Two', 'three'], ['four.', 'Five.'], ['Six.']]), ['One. Two', 'three four.', 'Five.', 'Six.']);
 assert.deepEqual(reflow(['Aaa. Bbb. Ccc.', 'Short one.'], 9), ['Aaa. Bbb.', 'Ccc.', 'Short one.']);   // long paragraphs split at sentence ends only
