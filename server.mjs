@@ -127,9 +127,9 @@ export function eta(job, now = Date.now()) {
   const left = job.progress >= 0.2 ? elapsed * (1 - job.progress) / job.progress : LOAD + job.seconds * rate - elapsed;
   return Math.max(1, Math.round(left));
 }
-// Greedy decoding without carrying text between 30 s windows: measured 28x realtime against 17x with whisper.cpp's
-// default beam search on this Mac, with the same words on the test recordings. Set WHISPER_ARGS='' for the slower default.
-const FAST = (env.WHISPER_ARGS ?? '-bs 1 -bo 1 -mc 0').split(' ').filter(Boolean);
+// Extra whisper.cpp flags, off by default. '-bs 1 -bo 1 -mc 0' looked 1.6x faster on one test file but skipped
+// 16% of the words on a mixed English/Spanish recording, so do not turn it on without checking word counts.
+const FAST = (env.WHISPER_ARGS ?? '').split(' ').filter(Boolean);
 async function transcribe(job) {
   const wav = job.file + '.wav', out = job.file + '.out';
   try {
