@@ -63,7 +63,10 @@
       "footNav": "More",
       "progress": "Transcribing, {p}%.",
       "eta": "About {m} min left.",
-      "etaSoon": "Less than a minute left."
+      "etaSoon": "Less than a minute left.",
+      "viewLabel": "Transcript view",
+      "viewStamps": "Timestamps",
+      "viewParas": "Paragraphs"
     },
     "es": {
       "about": "Acerca de y API",
@@ -141,7 +144,10 @@
       "footNav": "Más",
       "progress": "Transcribiendo, {p}%.",
       "eta": "Faltan unos {m} min.",
-      "etaSoon": "Falta menos de un minuto."
+      "etaSoon": "Falta menos de un minuto.",
+      "viewLabel": "Vista de la transcripción",
+      "viewStamps": "Con tiempos",
+      "viewParas": "Párrafos"
     }
   },
   "pages": [
