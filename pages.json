@@ -67,7 +67,10 @@
       "viewLabel": "Transcript view",
       "viewStamps": "Timestamps",
       "viewParas": "Paragraphs",
-      "uploaded": "Uploaded. Press Transcribe when you are ready."
+      "uploaded": "Uploaded. Press Transcribe when you are ready.",
+      "uploadingBtn": "Uploading...",
+      "remove": "Remove file",
+      "cancel": "Cancel"
     },
     "es": {
       "about": "Acerca de y API",
@@ -149,7 +152,10 @@
       "viewLabel": "Vista de la transcripción",
       "viewStamps": "Con tiempos",
       "viewParas": "Párrafos",
-      "uploaded": "Subido. Presiona Transcribir cuando quieras."
+      "uploaded": "Subido. Presiona Transcribir cuando quieras.",
+      "uploadingBtn": "Subiendo...",
+      "remove": "Quitar archivo",
+      "cancel": "Cancelar"
     }
   },
   "pages": [

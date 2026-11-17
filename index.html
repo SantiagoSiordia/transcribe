@@ -62,7 +62,7 @@ h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
 .drop.over{border-color:#4F46E5;background:#F1F0FE}
 .drop .ico{width:52px;height:52px;border-radius:50%;background:#E8E6FC;display:flex;align-items:center;justify-content:center}
 .drop strong{font-size:16px;font-weight:600;overflow-wrap:anywhere}
-.go{min-height:48px;padding:0 28px;border-radius:12px;border:none;background:#4F46E5;color:#FFF;font-weight:600;font-size:15px}
+.go{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 28px;border-radius:12px;border:none;background:#4F46E5;color:#FFF;font-weight:600;font-size:15px}
 .icons{display:flex;gap:4px}
 .icon{position:relative;width:44px;height:44px;border-radius:10px;border:none;background:transparent;display:flex;align-items:center;justify-content:center}
 .icon:hover{background:#ECEBFA}
@@ -120,6 +120,7 @@ input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,22
 .busy .drop .ico{animation:ring 1.8s var(--ease) infinite}
 @keyframes ring{from{box-shadow:0 0 0 0 rgba(79,70,229,.35)}to{box-shadow:0 0 0 16px rgba(79,70,229,0)}}
 .busy .drop label{display:none}
+.picks{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
 .drop.over .ico{transform:translateY(-4px) scale(1.06)}
 .drop.has{border-style:solid;border-color:#C9C5F5}
 .bar{width:min(320px,100%);height:4px;border-radius:2px;background:#E8E6FC;overflow:hidden;display:none}
@@ -132,6 +133,8 @@ input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,22
 #status{font-size:12.5px}
 .busy #dropSub{font-family:var(--mono);color:#3730A3}
 .bar{height:6px;border-radius:3px}
+.go.loading::before{content:"";width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.45);border-top-color:#FFF;animation:turn .7s linear infinite}
+@keyframes turn{to{transform:rotate(360deg)}}
 .busy #status::after{content:"\258D";margin-left:3px;color:#4F46E5;animation:blink 1s steps(2,jump-none) infinite}
 @keyframes blink{to{opacity:0}}
 /* a transcript arriving: the card settles in, its first lines follow one after another, its library row lights up */
@@ -242,7 +245,10 @@ dialog[open]::backdrop{background:rgba(23,23,26,.55)}
         <strong id="dropTitle">{{dropTitle}}</strong>
         <div class="bar" id="bar" aria-hidden="true"><i></i></div>
         <span class="sub" style="font-size:13px" id="dropSub">{{dropSub}}</span>
-        <label class="btn outline" style="margin-top:6px">{{choose}}<input type="file" id="file" class="sr" accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac,.amr,.mp4"></label>
+        <div class="picks">
+          <label class="btn outline">{{choose}}<input type="file" id="file" class="sr" accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac,.amr,.mp4"></label>
+          <button class="btn ghost" id="cancel" hidden><svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span></span></button>
+        </div>
       </div>
 
       <div class="split" style="align-items:center">
@@ -417,10 +423,30 @@ const drop = $('#drop');
 let up = null;   // the chosen file's upload: { x: the request, id: set once the server has the file, go: Transcribe was pressed }
 const status = s => { $('#status').textContent = s; $('#dropSub').textContent = busy || up ? s : T.dropSub; };
 const bar = p => { $('#bar').classList.toggle('scan', p == null); $('#bar').style.setProperty('--p', p ?? 0); };   // a fraction while uploading, null = working, length unknown
-const setBusy = b => { busy = b; drop.style.minHeight = b ? drop.offsetHeight + 'px' : ''; document.body.classList.toggle('busy', b); if (!b && !up) { bar(0); $('#dropSub').textContent = T.dropSub; } $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+const setBusy = b => { busy = b; drop.style.minHeight = b ? drop.offsetHeight + 'px' : ''; document.body.classList.toggle('busy', b); if (!b && !up) { bar(0); $('#dropSub').textContent = T.dropSub; } goBtn(); };
+// Transcribe is off, with a spinner, while the file is still uploading or the job is running
+function goBtn() {
+  const sending = !!up && !up.id, g = $('#go');
+  g.disabled = busy || sending || !file;
+  g.classList.toggle('loading', busy || sending);
+  g.textContent = busy ? T.transcribing : sending ? T.uploadingBtn : T.transcribe;
+  $('#cancel').hidden = !file && !busy;
+  $('#cancel span').textContent = busy ? T.cancel : T.remove;
+}
+let active = null;   // id of the job being followed; cancelling clears it and the polling stops
+function reset() {
+  file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle; drop.classList.remove('has');
+  status(T.noFile); setBusy(false);
+}
+// One button, two meanings: take the chosen file back, or stop the transcription that is running.
+$('#cancel').onclick = () => {
+  if (active) fetch('/api/jobs/' + active, { method: 'DELETE' });   // the server stops the job and deletes the audio
+  active = null; localStorage.removeItem('pending');
+  busy = false; forget(); reset();
+};
 function forget() {   // drop the current upload, on the server too
   if (up) { up.x.abort(); if (up.id) fetch('/api/jobs/' + up.id, { method: 'DELETE' }); }
-  up = null; drop.classList.remove('up'); onbeforeunload = null;
+  up = null; drop.classList.remove('up'); onbeforeunload = null; goBtn();
 }
 function pick(f) {
   if (!f || busy) return;
@@ -433,7 +459,7 @@ function pick(f) {
 // The upload starts the moment a file is chosen, so it is usually done by the time Transcribe is pressed.
 function upload(go = false) {
   const x = new XMLHttpRequest(), mine = up = { x, id: null, go };
-  drop.classList.add('up'); bar(0);
+  drop.classList.add('up'); bar(0); goBtn();
   onbeforeunload = e => e.preventDefault();   // leaving mid-upload loses the upload, so the browser asks first
   x.open('POST', '/api/transcribe?hold=1');
   const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
@@ -443,7 +469,7 @@ function upload(go = false) {
     if (up !== mine) return;
     let r = {}; try { r = JSON.parse(x.responseText); } catch {}
     if (x.status !== 202) return fail(x.status, r);
-    onbeforeunload = null; mine.id = r.id; bar(1);
+    onbeforeunload = null; mine.id = r.id; bar(1); goBtn();
     mine.go ? start() : status(T.uploaded);
   };
   x.send(file);
@@ -455,6 +481,7 @@ async function start() {
   try { res = await fetch(`/api/jobs/${id}/start?language=${lang}`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
   if (res.status === 404) return upload(true);   // it waited over 10 minutes and the server deleted it: send it again, then start
   if (!res.ok) return fail(res.status, r);
+  if (!busy) return void fetch('/api/jobs/' + id, { method: 'DELETE' });   // cancelled while the start request was in flight
   up = null; drop.classList.remove('up');
   localStorage.setItem('pending', JSON.stringify({ id, name }));   // from here a reload picks the job back up
   poll(id, name);
@@ -476,7 +503,7 @@ function thumb() {
 thumb(); addEventListener('resize', thumb); document.fonts.ready.then(thumb);
 requestAnimationFrame(() => requestAnimationFrame(() => $('#langs').classList.add('ready')));   // after the first paint, so the thumb does not slide in from nowhere
 function fail(code, r) {
-  localStorage.removeItem('pending'); onbeforeunload = null;
+  active = null; localStorage.removeItem('pending'); onbeforeunload = null;
   if (up) up.x.abort();
   up = null; drop.classList.remove('up');
   if (code === 401) localStorage.removeItem('apiKey');
@@ -490,14 +517,19 @@ $('#go').onclick = () => {
   else up.go = true;              // still uploading: start as soon as it lands
 };
 async function poll(id, name) {
+  active = id;
+  await follow(id, name);
+}
+async function follow(id, name) {
+  if (active !== id) return;
   let r;
-  try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(poll, 4000, id, name); }   // a network blip is not the end
+  try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(follow, 4000, id, name); }   // a network blip is not the end
   if (r.status === 'queued') status(T.queued.replace('{n}', r.position));
   if (r.status === 'processing') {
     const left = r.eta == null ? '' : ' ' + (r.eta < 60 ? T.etaSoon : T.eta.replace('{m}', Math.round(r.eta / 60)));
     status(r.progress ? T.progress.replace('{p}', Math.round(r.progress * 100)) + left : T.working + left);
   }
-  if (r.status === 'queued' || r.status === 'processing') { bar(r.progress || null); return setTimeout(poll, r.status === 'queued' ? 2000 : 1000, id, name); }
+  if (r.status === 'queued' || r.status === 'processing') { bar(r.progress || null); return setTimeout(follow, r.status === 'queued' ? 2000 : 1000, id, name); }
   if (r.status !== 'done') {
     const saved = JSON.parse(localStorage.getItem('transcripts') || '[]');   // another tab may have collected it already
     if (!saved.some(x => x.id === id)) return fail(0, r);
@@ -506,8 +538,9 @@ async function poll(id, name) {
   fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
   if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
   localStorage.removeItem('pending');
-  current = fresh = id; file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle; drop.classList.remove('has');
-  save(); render(); fresh = null; status(T.noFile); setBusy(false);
+  if (active !== id) return;   // cancelled while the last request was in flight
+  active = null; current = fresh = id;
+  save(); render(); fresh = null; reset();
   $('#doc').scrollIntoView({ block: 'nearest' });
   openModal(T.readyTitle);
 }

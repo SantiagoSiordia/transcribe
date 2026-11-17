@@ -86,8 +86,9 @@ let running = null, uploading = 0;
 export function enqueue(q, job) {
   q.splice(job.donor ? q.findLastIndex(j => j.donor) + 1 : q.length, 0, job);
 }
-const run = (cmd, args, timeout, onStderr) => new Promise((resolve, reject) => {
+const run = (cmd, args, timeout, onStderr, job) => new Promise((resolve, reject) => {
   const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'], timeout });
+  if (job) job.proc = p;   // so a cancelled job can be stopped mid-run
   let err = '';
   p.stderr.on('data', d => { err = (err + d).slice(-1500); onStderr?.(String(d)); });
   p.on('error', reject);
@@ -106,15 +107,17 @@ export function eta(job, now = Date.now()) {
 async function transcribe(job) {
   const wav = job.file + '.wav', out = job.file + '.out';
   try {
+    if (!jobs.has(job.id)) throw new Error('cancelled');
     await run(FFMPEG, ['-nostdin', '-v', 'error', '-protocol_whitelist', 'file', '-format_whitelist', FORMATS,
-      '-i', job.file, '-vn', '-map', '0:a:0', '-ac', '1', '-ar', '16000', '-t', String(MAX_SECONDS + 1), '-f', 'wav', '-y', wav], 10 * 60e3)
+      '-i', job.file, '-vn', '-map', '0:a:0', '-ac', '1', '-ar', '16000', '-t', String(MAX_SECONDS + 1), '-f', 'wav', '-y', wav], 10 * 60e3, null, job)
       .catch(e => { console.error('ffmpeg:', e.message); throw new Error('could not read this file as audio'); });
     const seconds = (fs.statSync(wav).size - 44) / 32000;   // 16 kHz, mono, 16-bit
     if (seconds > MAX_SECONDS) throw new Error('audio is longer than 3 hours');
     if (seconds < 0.2) throw new Error('the file has no audio');
+    if (!jobs.has(job.id)) throw new Error('cancelled');   // cancelled during conversion
     Object.assign(job, { seconds, started: Date.now(), progress: 0 });
     await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8'], 90 * 60e3,
-      s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); })
+      s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); }, job)
       .catch(e => { console.error('whisper:', e.message); throw new Error('transcription failed'); });
     // learn this machine's speed from every finished job, so the first estimate of the next one is close
     rate = 0.7 * rate + 0.3 * Math.max((Date.now() - job.started) / 1000 - LOAD, 0.1) / seconds;
@@ -294,7 +297,8 @@ export function createServer() {
         const i = queue.indexOf(j);
         if (i >= 0) queue.splice(i, 1);
         if (i >= 0 || j.status === 'uploaded') fs.rmSync(j.file, { force: true });
-        return send(res, 200, { ok: true });   // a job already running finishes, then its result is discarded
+        if (running === j) j.proc?.kill();     // cancelled mid-run: stop working on it now; transcribe()'s finally deletes the audio
+        return send(res, 200, { ok: true });
       }
 
       if (req.method === 'POST' && p === '/api/claim') {
