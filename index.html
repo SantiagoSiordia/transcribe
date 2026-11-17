@@ -19,7 +19,7 @@
 <style>
 @font-face{font-family:Inter;src:url(/public/inter.woff2) format("woff2");font-weight:100 900;font-display:swap}
 *{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui,sans-serif;color:#17171A;background:#F4F3EF}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#17171A;background:#F4F3EF radial-gradient(circle,#DFDDD5 1px,transparent 1.5px) 0 0/22px 22px}
 button,a,input{font-family:inherit}
 button,a{cursor:pointer}
 button:disabled{opacity:.6;cursor:default}
@@ -77,11 +77,11 @@ h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
 .prose{gap:12px}
 .prose h3{margin:8px 0 0;font-size:15px;font-weight:600}
 .prose p{margin:0;font-size:15px;line-height:1.65;color:#3F3F46}
-.prose a,footer a{color:#3730A3}
-footer{padding:24px 32px;border-top:1px solid #E6E4DE;background:#FFF;display:flex;gap:8px 20px;flex-wrap:wrap;font-size:13px}
+.prose a,footer nav a{color:#3730A3}
+footer{padding:20px 32px;border-top:1px solid #E6E4DE;background:#FFF;display:flex;gap:16px 24px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:13px}
+footer nav{display:flex;gap:8px 20px;flex-wrap:wrap;flex:1 1 300px}
 dialog{border:none;border-radius:20px;width:calc(100% - 40px);max-width:520px;max-height:calc(100% - 40px);padding:32px;box-shadow:0 24px 60px rgba(23,23,26,.28);color:inherit}
 dialog[open]{display:flex;flex-direction:column;gap:22px}
-dialog::backdrop{background:rgba(23,23,26,.55)}
 dialog p{margin:0;font-size:14px;line-height:1.6;color:#3F3F46}
 .box{border:1px solid #E6E4DE;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .box.tint{background:#F1F0FE;border-color:#F1F0FE}
@@ -91,7 +91,96 @@ dialog p{margin:0;font-size:14px;line-height:1.6;color:#3F3F46}
 code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflow-wrap:anywhere;user-select:all}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 [hidden]{display:none!important}
-@media(max-width:600px){.actions{gap:6px}.actions .btn{min-height:40px;padding:0 10px;font-size:13px}.seg button{padding:0 11px}}
+
+/* ---- motion: state and feedback only. Everything here is transform/opacity/colour, and all of it is off under reduced motion. ---- */
+:root{--ease:cubic-bezier(.22,1,.36,1);--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+.btn,.go,.icon,.row,.seg button,input,.drop,.drop .ico{transition:background-color .15s,border-color .15s,color .15s,box-shadow .2s,filter .15s,transform .2s var(--ease)}
+.btn:hover{filter:brightness(.96)}
+.btn:active,.icon:active,.go:active:not(:disabled){transform:scale(.97)}
+.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.35)}
+input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.16)}
+/* language switch: one thumb that slides between options (positioned from JS; the plain pill above is the fallback) */
+.seg{position:relative}
+.seg button{position:relative}
+.seg.ready::before{content:"";position:absolute;left:0;top:0;width:var(--w);height:var(--h);transform:translate(var(--x),var(--y));border-radius:9px;background:#FFF;box-shadow:0 1px 3px rgba(23,23,26,.14);transition:transform .28s var(--ease),width .28s var(--ease)}
+.seg.ready button[aria-pressed=true]{background:transparent;box-shadow:none}
+/* the waveform: still in the logo, alive while your audio is being worked on */
+.eq{display:flex;align-items:center;gap:2.5px;height:18px;color:#FFF}
+.eq i{width:2px;height:100%;border-radius:2px;background:currentColor;transform:scaleY(var(--s))}
+.eq i:nth-child(1){--s:.25;--t:.9s;--d:-.2s}.eq i:nth-child(2){--s:.65;--t:.7s;--d:-.5s}.eq i:nth-child(3){--s:1;--t:1.1s;--d:-.1s}.eq i:nth-child(4){--s:.45;--t:.8s;--d:-.7s}.eq i:nth-child(5){--s:.2;--t:1s;--d:-.4s}
+.busy .eq i,.brand:hover .eq i{animation:eq var(--t) ease-in-out var(--d) infinite alternate}
+@keyframes eq{from{transform:scaleY(.18)}to{transform:scaleY(1)}}
+.drop .ico .eq{display:none;color:#4F46E5;height:24px;gap:3px}
+.drop .ico .eq i{width:3px}
+.busy .drop .ico svg{display:none}
+.busy .drop .ico .eq{display:flex}
+.busy .drop .ico{animation:ring 1.8s var(--ease) infinite}
+@keyframes ring{from{box-shadow:0 0 0 0 rgba(79,70,229,.35)}to{box-shadow:0 0 0 16px rgba(79,70,229,0)}}
+.busy .drop label{visibility:hidden}
+.drop.over .ico{transform:translateY(-4px) scale(1.06)}
+.drop.has{border-style:solid;border-color:#C9C5F5}
+.bar{width:min(320px,100%);height:4px;border-radius:2px;background:#E8E6FC;overflow:hidden;opacity:0;transition:opacity .2s}
+.busy .bar{opacity:1}
+.bar i{display:block;height:100%;border-radius:2px;background:#4F46E5;transform-origin:left;transform:scaleX(var(--p,0));transition:transform .3s var(--ease)}
+.bar.scan i{width:40%;animation:scan 1.3s ease-in-out infinite}
+@keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+#status,#segs time,.row span,code{font-family:var(--mono)}
+#status{font-size:12.5px}
+.busy #status::after{content:"\258D";margin-left:3px;color:#4F46E5;animation:blink 1s steps(2,jump-none) infinite}
+@keyframes blink{to{opacity:0}}
+/* a transcript arriving: the card settles in, its first lines follow one after another, its library row lights up */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+#doc:not([hidden]){animation:rise .35s var(--ease)}
+#segs .in{animation:rise .4s var(--ease) backwards;animation-delay:calc(var(--i)*35ms)}
+.row.new{animation:rise .4s var(--ease) backwards,lit 1.6s ease-out}
+@keyframes lit{from{background:#DDD9FB}}
+.icon .ok{display:none}
+.icon.done svg:first-child{display:none}
+.icon.done .ok{display:block;animation:pop .3s var(--ease)}
+@keyframes pop{from{opacity:0;transform:scale(.5)}}
+dialog{opacity:0;transform:translateY(12px) scale(.97);transition:opacity .2s,transform .28s var(--ease),overlay .2s allow-discrete,display .2s allow-discrete}
+dialog[open]{opacity:1;transform:none}
+dialog::backdrop{background:rgba(23,23,26,0);transition:background-color .25s,overlay .25s allow-discrete,display .25s allow-discrete}
+dialog[open]::backdrop{background:rgba(23,23,26,.55)}
+@starting-style{dialog[open]{opacity:0;transform:translateY(12px) scale(.97)}dialog[open]::backdrop{background:rgba(23,23,26,0)}}
+@media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* ---- icons, chips, site-language switch, FAQ, footer signature ---- */
+.i{flex:0 0 auto}
+.locale{display:flex;align-items:center;gap:2px;padding:3px;border-radius:10px;background:#F1F0EC;color:#5C5B66}
+.locale .i{margin:0 5px 0 7px}
+.locale a{min-width:40px;min-height:38px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:600;color:#5C5B66;text-decoration:none;transition:background-color .15s,color .15s}
+.locale a:hover{color:#17171A}
+.locale a[aria-current]{background:#FFF;color:#17171A;box-shadow:0 1px 3px rgba(23,23,26,.14)}
+.chips{list-style:none;margin:0;padding:18px 0 0;border-top:1px solid #ECEAE4;display:flex;gap:10px 22px;flex-wrap:wrap;font-size:13px;font-weight:500;color:#3F3F46}
+.chips li{display:flex;align-items:center;gap:7px}
+.chips .i{color:#4F46E5}
+.note span{display:flex;gap:9px}
+.note .i{margin-top:1px;color:#3730A3}
+.box strong{display:flex;align-items:center;gap:9px}
+.prose h2{display:flex;align-items:center;gap:10px}
+.prose h2 .i{width:34px;height:34px;padding:8px;border-radius:10px;background:#F1F0FE;color:#4F46E5}
+.prose p{max-width:72ch}
+.faq{gap:0}
+.faq h2{margin-bottom:14px}
+.faq details{border-top:1px solid #ECEAE4}
+.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;font-size:15px;font-weight:600}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";flex:0 0 8px;height:8px;margin-right:6px;border-right:2px solid #5C5B66;border-bottom:2px solid #5C5B66;transform:translateY(-2px) rotate(45deg);transition:transform .25s var(--ease)}
+.faq details[open] summary::after{transform:translateY(2px) rotate(225deg)}
+.faq details p{padding-bottom:16px}
+.faq details[open] p{animation:rise .3s var(--ease)}
+@property --a{syntax:"<angle>";inherits:false;initial-value:0deg}
+.made{position:relative;isolation:isolate;margin-left:auto;display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 18px 0 8px;border-radius:999px;color:#FFF;font-weight:600;font-size:14px;text-decoration:none;transition:transform .25s var(--ease),box-shadow .25s}
+.made::before{content:"";position:absolute;inset:-2px;border-radius:inherit;z-index:-2;background:conic-gradient(from var(--a),#4F46E5,#FFDD00 20%,#4F46E5 40%,#2A2A30 60%,#2A2A30 85%,#4F46E5);animation:spin 5s linear infinite}
+.made::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;background:#17171A}
+@keyframes spin{to{--a:360deg}}
+.made .ss{width:32px;height:32px;border-radius:50%;background:#4F46E5;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.made .i{transition:transform .25s var(--ease)}
+.made:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(79,70,229,.45)}
+.made:hover::before{animation-duration:1.6s}
+.made:hover .i{transform:translate(3px,-3px)}
+@media(max-width:600px){#about .lbl{display:none}.made{margin:0 auto}.actions{gap:6px;flex:1 1 100%;justify-content:space-between}.actions .btn{min-height:40px;padding:0 10px;font-size:13px}.seg button{padding:0 11px}}
 @media(max-width:900px){aside{order:2;flex-basis:100%;border-right:none;border-top:1px solid #E6E4DE}main{padding:16px}header{padding:12px 16px}.card{padding:20px}}
 </style>
 </head>
@@ -100,12 +189,12 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
 
 <header>
   <a class="brand" href="{{home}}">
-    <span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2"/></svg></span>
+    <span class="logo" aria-hidden="true"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span></span>
     Transcribe
   </a>
   <div class="actions">
-    <a class="btn ghost" href="{{altPath}}" hreflang="{{altLang}}" lang="{{altLang}}">{{langSwitch}}</a>
-    <button class="btn" id="about">{{about}}</button>
+    <div class="locale" role="group" aria-label="{{siteLang}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 3.8 5.8 3.8 9s-1.3 6.2-3.8 9c-2.5-2.8-3.8-5.8-3.8-9S9.500 5.800 12 3z"/></svg><a href="{{enPath}}" hreflang="en" lang="en" {{enCur}}>EN</a><a href="{{esPath}}" hreflang="es" lang="es" {{esCur}}>ES</a></div>
+    <button class="btn" id="about" aria-label="{{about}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg><span class="lbl">{{about}}</span></button>
     <a class="btn coffee" href="{{coffee}}" target="_blank" rel="noopener noreferrer">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M9 3v2M13 3v2"/></svg>
       {{coffeeBtn}}
@@ -119,7 +208,7 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
     <input type="search" id="q" aria-label="{{searchLabel}}" placeholder="{{searchPh}}">
     <div id="lib"></div>
     <div class="note">
-      <span>{{privCard}}</span>
+      <span><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>{{privCard}}</span>
       <a href="{{repo}}" target="_blank" rel="noopener noreferrer">{{privLink}}</a>
     </div>
   </aside>
@@ -143,8 +232,9 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
       </div>
 
       <div class="drop" id="drop">
-        <div class="ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg></div>
+        <div class="ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg><span class="eq"><i></i><i></i><i></i><i></i><i></i></span></div>
         <strong id="dropTitle">{{dropTitle}}</strong>
+        <div class="bar" id="bar" aria-hidden="true"><i></i></div>
         <span class="sub" style="font-size:13px">{{dropSub}}</span>
         <label class="btn outline" style="margin-top:6px">{{choose}}<input type="file" id="file" class="sr" accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac,.amr,.mp4"></label>
       </div>
@@ -153,6 +243,12 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
         <span class="sub" style="font-size:13px" id="status" role="status" aria-live="polite">{{noFile}}</span>
         <button class="go" id="go" disabled>{{transcribe}}</button>
       </div>
+      <ul class="chips">
+        <li><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13"/><path d="M12 7c-1.500-3-5-3.500-5-1.500S9.500 7 12 7zm0 0c1.500-3 5-3.500 5-1.500S14.500 7 12 7z"/></svg>{{chipFree}}</li>
+        <li><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 20c1-4 4-5.500 7-5.500s6 1.500 7 5.500"/><path d="M4 4l16 16"/></svg>{{chipNoSign}}</li>
+        <li><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>{{chipDeleted}}</li>
+        <li><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>{{chipOpen}}</li>
+      </ul>
     </section>
 
     <section class="card" id="doc" hidden style="gap:18px">
@@ -164,6 +260,7 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
         <div class="icons">
           <button class="icon" id="copy" data-tip="{{copy}}" aria-label="{{copy}}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+            <svg class="ok" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
           </button>
           <button class="icon" id="dl" data-tip="{{download}}" aria-label="{{download}}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 11l6 6 6-6"/><path d="M4 20h16"/></svg>
@@ -181,9 +278,12 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
 </div>
 
 <footer>
-  {{nav}}
-  <a href="/docs">{{footDocs}}</a>
-  <a href="{{repo}}" target="_blank" rel="noopener noreferrer">{{footCode}}</a>
+  <nav aria-label="{{footNav}}">
+    {{nav}}
+    <a href="/docs">{{footDocs}}</a>
+    <a href="{{repo}}" target="_blank" rel="noopener noreferrer">{{footCode}}</a>
+  </nav>
+  <a class="made" href="https://santisiordia.com"><span class="ss" aria-hidden="true">S</span>{{madeBy}}<svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
 </footer>
 </div>
 
@@ -201,13 +301,13 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
   <a class="btn coffee" href="{{coffee}}" target="_blank" rel="noopener noreferrer" style="min-height:52px;border-radius:12px;font-weight:700;font-size:16px">{{coffeeBtn}}</a>
 
   <div class="box">
-    <strong>{{ossTitle}}</strong>
+    <strong><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>{{ossTitle}}</strong>
     <p>{{ossBody}}</p>
     <a class="btn" href="{{repo}}" target="_blank" rel="noopener noreferrer">{{ossLink}}</a>
   </div>
 
   <div class="box">
-    <strong>{{keyTitle}}</strong>
+    <strong><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg>{{keyTitle}}</strong>
     <p id="keyMsg">{{keyBody}}</p>
     <form id="claim">
       <label for="email" class="sr">{{emailLabel}}</label>
@@ -218,7 +318,7 @@ code{font-size:13px;background:#F1F0EC;padding:6px 8px;border-radius:6px;overflo
   </div>
 
   <div class="box tint">
-    <strong style="color:#1E1B4B">{{apiTitle}}</strong>
+    <strong style="color:#1E1B4B"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>{{apiTitle}}</strong>
     <p>{{apiBody}}</p>
     <a class="btn primary" href="/docs">{{apiBtn}}</a>
   </div>
@@ -238,7 +338,7 @@ const meta = it => `${langName(it.language)}, ${hour(it.at)}, ${clock(it.duratio
 const plain = it => it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
 
 // ---- library: this browser only ----
-let items = JSON.parse(localStorage.getItem('transcripts') || '[]'), current = items[0]?.id, file = null, lang = 'auto', busy = false;
+let items = JSON.parse(localStorage.getItem('transcripts') || '[]'), current = items[0]?.id, file = null, lang = 'auto', busy = false, fresh = null;
 function save() {
   // ponytail: localStorage holds about 5 MB, so the oldest transcripts fall off when it fills. IndexedDB if people hit that.
   for (;;) try { localStorage.setItem('transcripts', JSON.stringify(items)); return; } catch { if (items.length <= 1) return; items.pop(); }
@@ -253,6 +353,7 @@ function renderLib() {
     if (d !== last) lib.append(el('div', { className: 'day' }, last = d));
     const b = el('button', { className: 'row', onclick: () => { current = it.id; render(); } }, el('b', {}, it.name), el('span', {}, meta(it)));
     b.setAttribute('aria-current', it.id === current);
+    if (it.id === fresh) b.classList.add('new');
     lib.append(b);
   }
   if (!lib.children.length) lib.append(el('div', { className: 'day' }, T.emptyLib));
@@ -263,14 +364,18 @@ function renderDoc() {
   if (!it) return;
   $('#docName').textContent = it.name;
   $('#docMeta').textContent = `${langName(it.language)}, ${day(it.at)}, ${hour(it.at)}`;
-  $('#segs').replaceChildren(...it.segments.map(s => el('div', {}, el('time', {}, clock(s.start)), el('span', {}, s.text))));
+  $('#segs').replaceChildren(...it.segments.map((s, i) => {
+    const d = el('div', {}, el('time', {}, clock(s.start)), el('span', {}, s.text));
+    if (i < 16) { d.className = 'in'; d.style.setProperty('--i', i); }   // only the first screenful staggers; a 3-hour transcript must not start 3,000 animations
+    return d;
+  }));
 }
 const render = () => { renderLib(); renderDoc(); };
 $('#q').oninput = renderLib;
 
 $('#copy').onclick = async e => {
   await navigator.clipboard.writeText(plain(items.find(x => x.id === current)));
-  const b = e.currentTarget; b.dataset.tip = T.copied; setTimeout(() => { b.dataset.tip = T.copy; }, 1800);
+  const b = e.currentTarget; b.dataset.tip = T.copied; b.classList.add('done'); setTimeout(() => { b.dataset.tip = T.copy; b.classList.remove('done'); }, 1800);
 };
 $('#dl').onclick = () => {
   const it = items.find(x => x.id === current);
@@ -284,15 +389,17 @@ $('#del').onclick = () => {
 
 // ---- new transcription ----
 const status = s => { $('#status').textContent = s; };
-const setBusy = b => { busy = b; $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
+const bar = p => { $('#bar').classList.toggle('scan', p == null); $('#bar').style.setProperty('--p', p ?? 0); };   // a fraction while uploading, null = working, length unknown
+const setBusy = b => { busy = b; document.body.classList.toggle('busy', b); bar(0); $('#go').disabled = b || !file; $('#go').textContent = b ? T.transcribing : T.transcribe; };
 function pick(f) {
   if (!f || busy) return;
   if (f.size > 100 * 1024 * 1024) { file = null; status(T.tooBig); }
   else { file = f; $('#dropTitle').textContent = f.name; status(`${(f.size / 1048576).toFixed(1)} MB`); }
+  drop.classList.toggle('has', !!file);
   setBusy(false);
 }
-$('#file').onchange = e => pick(e.target.files[0]);
 const drop = $('#drop');
+$('#file').onchange = e => pick(e.target.files[0]);
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
 drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); };
@@ -300,7 +407,14 @@ $('#langs').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   lang = b.dataset.l;
   for (const x of $('#langs').children) x.setAttribute('aria-pressed', x === b);
+  thumb();
 };
+function thumb() {
+  const seg = $('#langs'), b = seg.querySelector('[aria-pressed=true]');
+  for (const [k, v] of [['x', b.offsetLeft], ['y', b.offsetTop], ['w', b.offsetWidth], ['h', b.offsetHeight]]) seg.style.setProperty('--' + k, v + 'px');
+}
+thumb(); addEventListener('resize', thumb); document.fonts.ready.then(thumb);
+requestAnimationFrame(() => requestAnimationFrame(() => $('#langs').classList.add('ready')));   // after the first paint, so the thumb does not slide in from nowhere
 function fail(code, r) {
   if (code === 401) localStorage.removeItem('apiKey');
   status(code === 429 ? T.rateLimited.replace('{n}', r.error.match(/\d+/)[0]).replace('{m}', Math.ceil(r.retryAfter / 60)) : T.failed.replace('{e}', tr(r.error) || T.offline));
@@ -311,7 +425,7 @@ $('#go').onclick = () => {
   setBusy(true);
   x.open('POST', '/api/transcribe?language=' + lang);
   const k = localStorage.getItem('apiKey'); if (k) x.setRequestHeader('Authorization', 'Bearer ' + k);
-  x.upload.onprogress = e => status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100)));
+  x.upload.onprogress = e => { bar(e.loaded / e.total); status(T.uploading.replace('{p}', Math.round(e.loaded / e.total * 100))); };
   x.onerror = () => fail(0, {});
   x.onload = () => {
     let r = {}; try { r = JSON.parse(x.responseText); } catch {}
@@ -324,12 +438,13 @@ async function poll(id, name) {
   try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(poll, 4000, id, name); }   // a network blip is not the end
   if (r.status === 'queued') status(T.queued.replace('{n}', r.position));
   if (r.status === 'processing') status(T.working);
-  if (r.status === 'queued' || r.status === 'processing') return setTimeout(poll, 2000, id, name);
+  if (r.status === 'queued' || r.status === 'processing') { bar(null); return setTimeout(poll, 2000, id, name); }
   if (r.status !== 'done') return fail(0, r);
   fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
   items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
-  current = id; file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle;
-  save(); render(); status(T.noFile); setBusy(false);
+  current = fresh = id; file = null; $('#file').value = ''; $('#dropTitle').textContent = T.dropTitle; drop.classList.remove('has');
+  save(); render(); fresh = null; status(T.noFile); setBusy(false);
+  $('#doc').scrollIntoView({ block: 'nearest' });
   openModal(T.readyTitle);
 }
 

@@ -125,6 +125,12 @@ async function pump() {
 const fill = (tpl, vars) => tpl.replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] ?? m);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const json = v => JSON.stringify(v).replace(/</g, '\\u003c');
+const ICON = d => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONS = [
+  '<path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2"/>',                                              // waveform
+  '<path d="M12 3l8 3v6c0 4.500-3.200 7.800-8 9-4.800-1.200-8-4.500-8-9V6z"/><path d="M9 12l2 2 4-4"/>',   // shield
+  '<circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.400-1 1-1 1.700M12 17v.500"/>',   // question
+];
 export function buildPages() {
   const tpl = fs.readFileSync(path.join(DIR, 'index.html'), 'utf8');
   const { strings, pages } = JSON.parse(fs.readFileSync(path.join(DIR, 'pages.json'), 'utf8'));
@@ -133,8 +139,8 @@ export function buildPages() {
     const url = ORIGIN + (p.path === '/' ? '/' : p.path), alt = pages.find(x => x.path === p.alt);
     const hreflang = alt ? [p, alt].map(x => `<link rel="alternate" hreflang="${x.lang}" href="${ORIGIN}${x.path}">`).join('\n')
       + `\n<link rel="alternate" hreflang="x-default" href="${ORIGIN}${p.lang === 'en' ? p.path : alt.path}">` : '';
-    const content = (p.sections || []).map(s => `<section class="card prose"><h2>${s.h}</h2>${s.p.map(t => `<p>${t}</p>`).join('')}</section>`).join('\n')
-      + (p.faq ? `\n<section class="card prose"><h2>${strings[p.lang].faqTitle}</h2>${p.faq.map(f => `<h3>${f.q}</h3><p>${f.a}</p>`).join('')}</section>` : '');
+    const content = (p.sections || []).map((s, i) => `<section class="card prose"><h2>${ICON(ICONS[i % 2])}${s.h}</h2>${s.p.map(t => `<p>${t}</p>`).join('')}</section>`).join('\n')
+      + (p.faq ? `\n<section class="card prose faq"><h2>${ICON(ICONS[2])}${strings[p.lang].faqTitle}</h2>${p.faq.map(f => `<details><summary>${f.q}</summary><p>${f.a}</p></details>`).join('')}</section>` : '');
     const ld = [{ '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Transcribe', url, description: p.description,
       inLanguage: p.lang, applicationCategory: 'MultimediaApplication', operatingSystem: 'Any', isAccessibleForFree: true,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } }];
@@ -143,7 +149,8 @@ export function buildPages() {
     const nav = pages.filter(x => x.lang === p.lang && x.path !== p.path).map(x => `<a href="${x.path}">${x.nav}</a>`).join('');
     out.set(p.path, fill(tpl, { ...strings[p.lang], lang: p.lang, title: esc(p.title), description: esc(p.description), h1: p.h1, sub: p.sub,
       canonical: url, hreflang, content, nav, jsonld: json(ld), T: json(strings[p.lang]), origin: ORIGIN, repo: REPO, coffee: COFFEE,
-      home: p.lang === 'en' ? '/' : '/es', altPath: alt?.path || (p.lang === 'en' ? '/es' : '/'), altLang: p.lang === 'en' ? 'es' : 'en' }));
+      home: p.lang === 'en' ? '/' : '/es', enPath: p.lang === 'en' ? p.path : alt?.path || '/', esPath: p.lang === 'es' ? p.path : alt?.path || '/es',
+      enCur: p.lang === 'en' ? 'aria-current="page"' : '', esCur: p.lang === 'es' ? 'aria-current="page"' : '' }));
   }
   return out;
 }
