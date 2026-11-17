@@ -3,6 +3,7 @@
 //   - uploaded audio: a temp file, deleted the moment its job ends (see transcribe()) and on every start;
 //     an upload that is never started is deleted after 10 minutes (HOLD_TTL)
 //   - transcripts: in memory only, dropped RESULT_TTL after the job ends (see the sweep at the bottom)
+//   - readable paragraphs (optional, ?polish=1): made by a second local model through Ollama on 127.0.0.1, same lifetime as the transcript
 //   - data/donors.json: sha256(donor email) -> API key. No plain emails, no IPs, no request logs.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -23,6 +24,8 @@ const FFMPEG = env.FFMPEG_BIN || '/opt/homebrew/bin/ffmpeg';
 const WHISPER = env.WHISPER_BIN || '/opt/homebrew/bin/whisper-cli';
 const MODEL = env.WHISPER_MODEL || path.join(os.homedir(), 'Library/Application Support/transcribe/ggml-large-v3-turbo.bin');
 const DONORS = env.DONORS_FILE || path.join(DIR, 'data/donors.json');
+const OLLAMA = env.OLLAMA_URL || 'http://127.0.0.1:11434';   // local only: transcript text never leaves this machine
+const POLISH_MODEL = env.POLISH_MODEL ?? 'gemma3:4b';          // set to an empty string to switch the cleanup pass off
 const TMP = env.TMP_DIR || path.join(os.tmpdir(), 'transcribe-uploads');
 
 const MAX_BYTES = 100 * 1024 * 1024;   // Cloudflare's free-plan upload ceiling
@@ -130,11 +133,91 @@ async function transcribe(job) {
     for (const f of [job.file, wav, out + '.json']) fs.rmSync(f, { force: true });   // the audio never outlives its job
   }
 }
+// ---- readable paragraphs: a local LLM fixes punctuation, case and paragraph breaks, and nothing else ----
+const POLISH_PROMPT = `You fix the punctuation, capitalization and paragraph breaks of a speech transcript so it reads naturally.
+Rules:
+- Keep every word exactly as it is, in the same order. Do not add, remove, translate, correct or replace any word.
+- You may only change: punctuation marks, upper/lower case, and where paragraphs break (use a blank line).
+- Keep the language of the transcript.
+- Output only the transcript text, nothing else.`;
+// The guarantee: identical once case, punctuation and spacing are ignored. A model that changes a word is not trusted.
+export const sameWords = (a, b) => { const n = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''); return n(a) === n(b); };
+export function chunks(segments, max = 1200) {
+  const out = []; let cur = '';
+  for (const s of segments) {
+    if (cur && cur.length + s.text.length > max) { out.push(cur); cur = ''; }
+    cur += (cur ? ' ' : '') + s.text;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+// Chunks are cut at arbitrary points, so a paragraph left open at the end of one continues into the next.
+export function joinParas(parts) {
+  const out = [];
+  for (const ps of parts) ps.forEach((p, i) => {
+    if (i === 0 && out.length && !/[.?!…"”»)]$/.test(out.at(-1))) out[out.length - 1] += ' ' + p; else out.push(p);
+  });
+  return out;
+}
+// Models rarely break paragraphs on their own, so long ones are split at sentence ends into readable blocks.
+export function reflow(paras, target = 450) {
+  return paras.flatMap(p => {
+    const out = []; let cur = '';
+    for (const s of p.split(/(?<=[.?!…])\s+/)) {
+      if (cur && cur.length + s.length > target) { out.push(cur); cur = ''; }
+      cur += (cur ? ' ' : '') + s;
+    }
+    return cur ? [...out, cur] : out;
+  });
+}
+let polishing = Promise.resolve();   // one cleanup at a time, alongside the transcription worker
+// One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
+async function tidy(raw) {
+  const letters = raw.replace(/[^\p{L}]/gu, '');
+  const shouting = letters && letters.replace(/[^\p{Lu}]/gu, '').length / letters.length > 0.8;   // ALL CAPS in: models keep it, so hand it over lowercased
+  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(120e3), body: JSON.stringify({
+    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096 },
+    messages: [{ role: 'system', content: POLISH_PROMPT }, { role: 'user', content: shouting ? raw.toLowerCase() : raw }] }) });
+  if (!r.ok) throw new Error('ollama answered ' + r.status);
+  const out = (await r.json()).message.content.trim();
+  return sameWords(out, raw) ? out.split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
+}
+async function polish(job) {
+  const p = job.polish, t0 = Date.now();
+  let kept = 0, total = 0;
+  p.status = 'running';
+  try {
+    const cs = chunks(job.result.segments), parts = [];
+    for (const [i, raw] of cs.entries()) {
+      if (!jobs.has(job.id)) return;   // deleted or cancelled meanwhile
+      let ps = await tidy(raw);
+      total += raw.length;
+      if (ps) kept += raw.length;
+      else {   // a word changed somewhere: try the two halves on their own, and keep Whisper's text for whichever still fails
+        const cut = raw.indexOf(' ', raw.length >> 1);
+        ps = [];
+        for (const half of cut < 0 ? [raw] : [raw.slice(0, cut), raw.slice(cut + 1)]) {
+          const h = cut < 0 ? null : await tidy(half);
+          if (h) kept += half.length;
+          ps = joinParas([ps, h || [half]]);
+        }
+      }
+      parts.push(ps);
+      p.progress = (i + 1) / cs.length;
+    }
+    p.paragraphs = reflow(joinParas(parts));
+    p.status = 'done';
+    console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s, model text kept for ${Math.round(100 * kept / total)}%`);
+  } catch (e) { console.error('polish:', e.message); p.status = 'failed'; }
+}
 async function pump() {
   if (running || !queue.length) return;
   const job = running = queue.shift();
   job.status = 'processing';
-  try { job.result = await transcribe(job); job.status = 'done'; }
+  try {
+    job.result = await transcribe(job); job.status = 'done';
+    if (job.polish) polishing = polishing.then(() => polish(job));   // the transcript is already available; paragraphs follow
+  }
   catch (e) { job.status = 'error'; job.error = e.message; }
   job.finished = Date.now();
   console.log(`job ${job.status} ${job.result?.duration ?? 0}s ${job.donor ? 'donor' : 'free'}`);   // counts only, nothing personal
@@ -202,7 +285,9 @@ const ip = req => req.headers['cf-connecting-ip'] || req.socket.remoteAddress;
 const view = j => ({ id: j.id, status: j.status,
   ...(j.status === 'queued' && { position: queue.indexOf(j) + (running ? 1 : 0) }),
   ...(j.status === 'processing' && j.started != null && { progress: j.progress, eta: eta(j) }),
-  ...(j.status === 'error' && { error: j.error }), ...j.result });
+  ...(j.status === 'error' && { error: j.error }), ...j.result,
+  ...(j.status === 'done' && j.polish && { polish: j.polish.status, polishProgress: j.polish.progress, ...(j.polish.paragraphs && { paragraphs: j.polish.paragraphs }) }) });
+const wantsPolish = url => (url.searchParams.has('polish') && POLISH_MODEL ? { status: 'queued', progress: 0 } : undefined);
 
 export function createServer() {
   fs.rmSync(TMP, { recursive: true, force: true });   // audio left behind by a crash goes now
@@ -241,7 +326,7 @@ export function createServer() {
         const rate = { 'X-RateLimit-Limit': lim.limit, 'X-RateLimit-Remaining': lim.remaining };
         if (!lim.ok) return send(res, 429, { error: `limit of ${lim.limit} transcriptions per hour reached`, retryAfter: lim.retryAfter },
           'application/json', { ...rate, 'Retry-After': lim.retryAfter });
-        const job = { id: crypto.randomUUID(), status: hold ? 'uploaded' : 'queued', language, donor: !!key, owner };
+        const job = { id: crypto.randomUUID(), status: hold ? 'uploaded' : 'queued', language, donor: !!key, owner, polish: wantsPolish(url) };
         job.file = path.join(TMP, job.id);
         let n = 0;
         uploading++;
@@ -278,7 +363,7 @@ export function createServer() {
         const rate = { 'X-RateLimit-Limit': lim.limit, 'X-RateLimit-Remaining': lim.remaining };
         if (!lim.ok) return send(res, 429, { error: `limit of ${lim.limit} transcriptions per hour reached`, retryAfter: lim.retryAfter },
           'application/json', { ...rate, 'Retry-After': lim.retryAfter });
-        Object.assign(j, { status: 'queued', language });
+        Object.assign(j, { status: 'queued', language, polish: wantsPolish(url) || j.polish });
         enqueue(queue, j);
         const body = view(j);
         pump();

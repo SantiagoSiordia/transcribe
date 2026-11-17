@@ -43,6 +43,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "polish",
+            "in": "query",
+            "description": "Add `polish=1` to also get readable paragraphs. After the job is `done`, a local language model fixes punctuation, capitalization and paragraph breaks (it cannot change words: any stretch where it does is left as Whisper wrote it). Keep polling until `polish` is `done` or `failed`, then read `paragraphs`.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -285,6 +293,14 @@
               ]
             },
             "description": "Overrides the language given at upload."
+          },
+          {
+            "name": "polish",
+            "in": "query",
+            "description": "Add `polish=1` to also get readable paragraphs. After the job is `done`, a local language model fixes punctuation, capitalization and paragraph breaks (it cannot change words: any stretch where it does is left as Whisper wrote it). Keep polling until `polish` is `done` or `failed`, then read `paragraphs`.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -395,6 +411,27 @@
           "text": {
             "type": "string",
             "description": "All segments, one per line."
+          },
+          "polish": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "description": "Only when polish=1 was requested and the job is done."
+          },
+          "polishProgress": {
+            "type": "number",
+            "description": "0 to 1."
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Readable paragraphs, once polish is done."
           }
         }
       }

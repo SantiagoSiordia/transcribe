@@ -356,6 +356,7 @@ const meta = it => `${langName(it.language)}, ${hour(it.at)}, ${clock(it.duratio
 let view = localStorage.getItem('view') || 'stamps';
 // Paragraphs: a new one starts after a pause of 2 s, or at a sentence end once the paragraph is long enough.
 const paras = it => {
+  if (it.paragraphs) return it.paragraphs;   // the tidied version, when the server made one
   const out = []; let cur = '', prev;
   for (const s of it.segments) {
     if (cur && (s.start - prev.end > 2 || (cur.length > 400 && /[.?!…]$/.test(cur)))) { out.push(cur); cur = ''; }
@@ -392,7 +393,7 @@ function renderDoc() {
   $('#doc').hidden = !it;
   if (!it) return;
   $('#docName').textContent = it.name;
-  $('#docMeta').textContent = `${langName(it.language)}, ${day(it.at)}, ${hour(it.at)}`;
+  $('#docMeta').textContent = `${langName(it.language)}, ${day(it.at)}, ${hour(it.at)}` + (it.polish ? ` · ${T.polishing}` : '');
   for (const b of $('#view').children) b.setAttribute('aria-pressed', b.dataset.v === view);
   $('#segs').replaceChildren(...(view === 'paras' ? paras(it) : it.segments).map((s, i) => {
     const d = view === 'paras' ? el('p', {}, s) : el('div', {}, el('time', {}, clock(s.start)), el('span', {}, s.text));
@@ -478,7 +479,7 @@ async function start() {
   const { id } = up, name = file.name;
   bar(null); status(T.working);
   let res, r = {};
-  try { res = await fetch(`/api/jobs/${id}/start?language=${lang}`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
+  try { res = await fetch(`/api/jobs/${id}/start?language=${lang}&polish=1`, { method: 'POST' }); r = await res.json(); } catch { return fail(0, {}); }
   if (res.status === 404) return upload(true);   // it waited over 10 minutes and the server deleted it: send it again, then start
   if (!res.ok) return fail(res.status, r);
   if (!busy) return void fetch('/api/jobs/' + id, { method: 'DELETE' });   // cancelled while the start request was in flight
@@ -535,14 +536,28 @@ async function follow(id, name) {
     if (!saved.some(x => x.id === id)) return fail(0, r);
     items = saved;
   }
-  fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
-  if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments });
+  const tidying = r.polish === 'queued' || r.polish === 'running';
+  if (!tidying) fetch('/api/jobs/' + id, { method: 'DELETE' });   // we have it; the server can forget it now
+  if (r.status === 'done') items.unshift({ id, name, at: Date.now(), language: r.language, duration: r.duration, segments: r.segments, paragraphs: r.paragraphs, polish: tidying || undefined });
+  if (tidying) setTimeout(tidy, 3000, id);
   localStorage.removeItem('pending');
   if (active !== id) return;   // cancelled while the last request was in flight
   active = null; current = fresh = id;
   save(); render(); fresh = null; reset();
   $('#doc').scrollIntoView({ block: 'nearest' });
   openModal(T.readyTitle);
+}
+// The transcript is shown as soon as it exists. The readable paragraphs arrive a little later and are swapped in.
+async function tidy(id) {
+  const it = items.find(x => x.id === id);
+  if (!it || !it.polish) return;
+  let r;
+  try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(tidy, 6000, id); }
+  if (r.polish === 'queued' || r.polish === 'running') return setTimeout(tidy, 3000, id);
+  delete it.polish;                                    // done, failed, or the server no longer has it: stop waiting either way
+  if (r.paragraphs) it.paragraphs = r.paragraphs;
+  if (r.id) fetch('/api/jobs/' + id, { method: 'DELETE' });
+  save(); if (current === id) renderDoc();
 }
 
 // ---- modal ----
@@ -564,6 +579,7 @@ $('#claim').onsubmit = async e => {
 };
 
 render();
+for (const it of items) if (it.polish) tidy(it.id);   // reloaded while paragraphs were being tidied
 const pending = JSON.parse(localStorage.getItem('pending') || 'null');   // reloaded mid-job: carry on where it was
 if (pending) { setBusy(true); $('#dropTitle').textContent = pending.name; drop.classList.add('has'); status(T.working); poll(pending.id, pending.name); }
 </script>

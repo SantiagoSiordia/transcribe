@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, chunks, joinParas, reflow } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -47,6 +47,16 @@ assert.equal(eta({}), undefined);                                             //
 assert.equal(eta({ started: 0, seconds: 600, progress: 0 }, 0), 27);         // 3 s load + 600 s * 0.04
 assert.equal(eta({ started: 0, seconds: 600, progress: 0.25 }, 10e3), 30);   // 25% took 10 s, so 30 s to go
 assert.equal(eta({ started: 0, seconds: 5, progress: 0 }, 60e3), 1);         // never zero or negative while still running
+
+// readable paragraphs: the cleanup may touch case, punctuation and breaks, never a word
+assert.equal(sameWords('so yesterday i was there and she said yes', 'So, yesterday I was there.\n\nAnd she said: "Yes!"'), true);
+assert.equal(sameWords('let us move on', "Let's move on."), false);           // a contraction is a changed word
+assert.equal(sameWords('it cost $40,000', 'It cost $40,000.'), true);
+assert.equal(sameWords('fuimos a méxico', 'Fuimos a Mexico.'), false);         // so is a dropped accent
+assert.deepEqual(chunks([{ text: 'a'.repeat(700) }, { text: 'b'.repeat(700) }, { text: 'c' }]).map(c => c.length), [700, 702]);
+assert.deepEqual(joinParas([['One. Two', 'three'], ['four.', 'Five.'], ['Six.']]), ['One. Two', 'three four.', 'Five.', 'Six.']);
+assert.deepEqual(reflow(['Aaa. Bbb. Ccc.', 'Short one.'], 9), ['Aaa. Bbb.', 'Ccc.', 'Short one.']);   // long paragraphs split at sentence ends only
+assert.deepEqual(reflow(['no sentence end here at all'], 5), ['no sentence end here at all']);
 
 // pages: every page renders with no placeholder left, and each has its language pair
 const pages = buildPages();
