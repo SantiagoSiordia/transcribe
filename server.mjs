@@ -32,6 +32,9 @@ const MODEL = env.WHISPER_MODEL || path.join(os.homedir(), 'Library/Application 
 const DONORS = env.DONORS_FILE || path.join(DIR, 'data/donors.json');
 const OLLAMA = env.OLLAMA_URL || 'http://127.0.0.1:11434';   // local only: transcript text never leaves this machine
 const POLISH_MODEL = env.POLISH_MODEL ?? 'gemma3:4b';          // set to an empty string to switch the cleanup pass off
+// The summary needs judgement (who does what, what was decided), where the small model invents roles and fills empty
+// sections. A larger one writes it; it is one short answer per recording, so the extra time is seconds.
+const SUMMARY_MODEL = env.SUMMARY_MODEL || 'gemma3:12b';
 const TMP = env.TMP_DIR || path.join(os.tmpdir(), 'transcribe-uploads');
 
 const MAX_BYTES = 100 * 1024 * 1024;   // Cloudflare's free-plan upload ceiling
@@ -233,9 +236,9 @@ let polishing = Promise.resolve();   // one cleanup at a time, alongside the tra
 // num_ctx 4096 on purpose: on this Mac the model writes about 1.6x faster than at 8192, and no call here needs more.
 // maxTokens matters: left alone, the model sometimes keeps writing (it was seen producing 1,800 tokens for a passage
 // that needs 350), which held up every paragraph and the summary behind it. A cut-off answer simply fails the word check.
-async function ask(system, user, maxTokens) {
+async function ask(system, user, maxTokens, model = POLISH_MODEL) {
   const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(90e3), body: JSON.stringify({
-    model: POLISH_MODEL, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096, num_predict: maxTokens },
+    model, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096, num_predict: maxTokens },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
   if (!r.ok) throw new Error('ollama answered ' + r.status);
   return (await r.json()).message.content.trim();
@@ -256,11 +259,27 @@ async function tidy(raw) {
   return sameWords(out, raw) ? unstutter(out).split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
 }
 // A summary is new text written by the model, so unlike the paragraphs it cannot be checked word for word. The page says so.
-const SUMMARY_PROMPT = `You summarize a speech transcript (or notes taken from one).
-Write in the same language as the transcript. Use only what is said in it; do not add facts or opinions.
-Format: two or three plain sentences, then a blank line, then 3 to 6 short key points, each on its own line starting with "- ".
-No headings, no bold, no preamble. Output only the summary.`;
-const NOTES_PROMPT = `List the key points of this part of a speech transcript as short lines starting with "- ", in the same language as the transcript. Use only what is said. Output only the list.`;
+// Its sections depend on the recording: a meeting gets decisions and action items, a voice note may get only key points.
+const SUMMARY_PROMPT = `You write a professional summary of a speech transcript. It may be a meeting, a call, an interview, a lecture or a voice note; work out which from the content.
+Write the whole summary, section titles included, in {language}. Use only what is said: never invent names, roles, dates, numbers, tasks or decisions. The transcript has no speaker labels, so name a person only when the transcript does; otherwise say "the speaker".
+
+Format:
+- Begin with two or three plain sentences (no title, no bullets) saying what the recording is about and how it ends.
+- Then section titles as lines starting with "## ", and under each, short lines starting with "- ".
+- Include ONLY the sections the content supports, in this order. Leave a section out entirely if it would be empty or guessed; never write "none" or "not mentioned".
+  - People: only if at least one person is named. Who is named, and what they are responsible for if it is stated.
+  - Key points: the main things said.
+  - Decisions: only what was explicitly decided.
+  - Action items: one per line, starting with who will do it, then what, and by when if stated.
+  - Open questions or risks: what is unresolved or could go wrong.
+  - Dates and numbers: deadlines, amounts and figures mentioned.
+- If the recording is something else (a tutorial, a story, a lecture), use the sections that fit it instead, such as steps or main ideas.
+No preamble, no closing remarks, no bold text. Output only the summary.`;
+const NOTES_PROMPT = `These are notes from one part of a longer speech transcript, or the transcript part itself. List what matters as short lines starting with "- ", in {language}: main points, who said or will do what, decisions, open questions, and every date and number. Use only what is said; name a person only when the text does. Output only the list.`;
+// Models are loose with the format (a title as "People:" instead of "## People", bold marks). One shape goes out.
+export const tidySummary = text => text.replace(/\*\*/g, '').split('\n').map(l => l.trim())
+  .map(l => (/^#+\s*\S/.test(l) ? '## ' + l.replace(/^#+\s*/, '').replace(/:$/, '') : /^[^-•*].{1,48}:$/.test(l) ? '## ' + l.slice(0, -1) : l.replace(/^[•*]\s+/, '- ')))
+  .join('\n').replace(/\n{3,}/g, '\n\n').trim();
 // Text is split into parts that fit the model's window (6000 characters is roughly 2000 tokens).
 export function parts(text, max = 6000) {
   const out = [];
@@ -272,18 +291,23 @@ export function parts(text, max = 6000) {
   return out;
 }
 async function summarize(job) {
+  let language = 'the same language as the transcript';
+  try { language = new Intl.DisplayNames(['en'], { type: 'language' }).of(job.result.language) || language; } catch {}   // "es" -> "Spanish"
+  const say = prompt => prompt.replace('{language}', language);
   let text = chunks(job.result.segments, 6000).join('\n');
   // Long recording: notes per part, then notes of the notes, until what is left fits in one call.
   while (text.length > 6000) {
     if (!jobs.has(job.id)) return undefined;
-    text = (await pool(parts(text), c => ask(NOTES_PROMPT, c, 350))).join('\n');
+    text = (await pool(parts(text), c => ask(say(NOTES_PROMPT), c, 400, SUMMARY_MODEL))).join('\n');
   }
-  return ask(SUMMARY_PROMPT, text, 450);
+  return tidySummary(await ask(say(SUMMARY_PROMPT), text, 800, SUMMARY_MODEL));
 }
 async function polish(job) {
   const p = job.polish, t0 = Date.now();
   let kept = 0, total = 0, done = 0;
   p.status = 'running';
+  // The summary is written at the same time as the paragraphs, not after them, and each shows up as soon as it is ready.
+  const summary = p.summary && summarize(job).then(t => { p.summaryText = t; }, e => console.error('summary:', e.message));
   try {
     const cs = p.paras ? chunks(job.result.segments) : [];
     const plain = chunks(calm(job.result.segments));   // same cuts (only case differs): what is shown where the model's version is rejected
@@ -305,7 +329,7 @@ async function polish(job) {
     });
     if (!jobs.has(job.id)) return;
     if (p.paras) p.paragraphs = reflow(joinParas(out));   // available to the page right away, while the summary is written
-    if (p.summary) p.summaryText = await summarize(job);
+    await summary;
     p.status = 'done';
     console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s` + (total ? `, model text kept for ${Math.round(100 * kept / total)}%` : ''));
   } catch (e) { console.error('polish:', e.message); p.status = 'failed'; }

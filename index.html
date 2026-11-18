@@ -86,6 +86,7 @@ h2{margin:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
 #segs .li{padding:4px 0 4px 20px;position:relative}
 #segs .li::before{content:"";position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:#4F46E5}
 #segs .hint{font-size:13px;color:#5C5B66}
+#segs .h{padding:20px 0 2px;font-size:15px;font-weight:700;color:#17171A}
 #segs .wait{display:flex;align-items:center;gap:12px;padding:14px 0 10px;font-size:14px;font-weight:600;color:#3730A3}
 .wait .eq{color:#4F46E5;height:20px}
 .wait .eq i{animation:eq var(--t) ease-in-out var(--d) infinite alternate}
@@ -388,7 +389,7 @@ const paras = it => {
   if (cur) out.push(cur);
   return out.map(p => p.replace(/(?<![\p{L}\p{N}])(\p{L}+)(?:[\s,]+\1)+(?![\p{L}\p{N}])/giu, '$1'));
 };
-const plain = it => view === 'summary' ? (it.summary || '') : view === 'paras' ? paras(it).join('\n\n') : it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
+const plain = it => view === 'summary' ? (it.summary || '').replace(/^## (.*)$/gm, '\n$1:').trim() : view === 'paras' ? paras(it).join('\n\n') : it.segments.map(s => `[${clock(s.start)}] ${s.text}`).join('\n');
 
 // ---- library: this browser only ----
 let items = JSON.parse(localStorage.getItem('transcripts') || '[]'), current = items[0]?.id, file = null, lang = 'auto', busy = false, fresh = null;
@@ -428,7 +429,7 @@ function renderDoc() {
     }
     const note = el('p', { className: 'hint' }, it.summary ? T.summaryNote : T.noSummary);
     return $('#segs').replaceChildren(...lines.map((l, i) => {
-      const p = el('p', { className: (/^[-*•]\s/.test(l) ? 'li ' : '') + 'in' }, l.replace(/^[-*•]\s+/, ''));
+      const p = el('p', { className: (/^## /.test(l) ? 'h ' : /^[-*•]\s/.test(l) ? 'li ' : '') + 'in' }, l.replace(/^(## |[-*•]\s+)/, ''));
       p.style.setProperty('--i', i); return p;
     }), note);
   }

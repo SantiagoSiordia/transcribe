@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 Object.assign(process.env, { DONORS_FILE: path.join(dir, 'donors.json'), TMP_DIR: path.join(dir, 'up'), BMC_WEBHOOK_SECRET: 's3cret', STATS_FILE: path.join(dir, 'stats.json'), ADMIN_KEY: 'adm1n' });
-const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, unstutter, calm, chunks, joinParas, reflow, count, pool, parts, parseEngineJson } = await import('./server.mjs');
+const { limiter, verifySig, enqueue, grant, claim, revoke, buildPages, createServer, eta, sameWords, tidySummary, unstutter, calm, chunks, joinParas, reflow, count, pool, parts, parseEngineJson } = await import('./server.mjs');
 
 // rate limiter: 3 per hour, then blocked, then free again once the window slides
 const take = limiter(3, 1000);
@@ -79,6 +79,10 @@ const eng = parseEngineJson('{"segments": [{"text": " To Infinity, and NaN: NaN,
 assert.equal(eng.segments[0].avg_logprob, null);
 assert.equal(eng.segments[0].x, null);
 assert.equal(eng.segments[0].text, ' To Infinity, and NaN: NaN, they said');
+
+// summary format: whatever the model does with titles and bullets, one shape goes out
+assert.equal(tidySummary('Intro **sentence**.\n\n\n\nPeople:\n• Ana: copy by Wednesday\n### Decisions:\n- Cut the animations\n- Ana: note that this line is not a title:'),
+  'Intro sentence.\n\n## People\n- Ana: copy by Wednesday\n## Decisions\n- Cut the animations\n- Ana: note that this line is not a title:');
 
 // pages: every page renders with no placeholder left, and each has its language pair
 const pages = buildPages();
