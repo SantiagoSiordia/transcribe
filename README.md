@@ -52,12 +52,25 @@ curl -L -o ~/Library/Application\ Support/transcribe/ggml-large-v3-turbo.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
 cp .env.example .env
 node --env-file=.env server.mjs      # http://127.0.0.1:3015
-node server.test.mjs                 # checks
+node server.test.mjs                 # checks (see Tests below for the end-to-end suite)
 ```
 
 Paths, port, public URL and links are environment variables listed in `.env.example` and at the top of `server.mjs`. `com.santi.transcribe.plist` is the LaunchAgent I use to keep it running. The server listens on `127.0.0.1` only and trusts `CF-Connecting-IP`, so put it behind a Cloudflare tunnel or change `ip()` for your proxy.
 
 Page copy and the SEO landing pages live in `pages.json`; `index.html` is the single template.
+
+## Tests
+
+```sh
+npm install && npx playwright install chromium   # once; Playwright is the only dependency and only the tests use it
+npm test          # server logic: limits, keys, the no-changed-words guard, usage counts
+npm run e2e       # 41 browser and API flows in English and Spanish, about 30 seconds
+npm run e2e:real  # the same flows against the real Whisper and Gemma on this machine, about 2 minutes
+```
+
+The end-to-end tests start their own server on port 3115 with temporary data, so they never touch a running service. By default Whisper and the language model are replaced by stand-ins (`e2e/fake-whisper.mjs` and a stub in `e2e/stack.mjs`), which keeps the run fast and lets it run on GitHub; ffmpeg is real in both modes. `E2E_LOGS=1` shows the server's log, and a failing test leaves a screenshot and a trace in `test-results/`.
+
+What they cover, each in both languages: choosing a file through to a transcript that survives a reload; the three views with copy and download; removing a file; cancelling a running transcription; reloading mid-job; error and rate-limit messages; the library; supporter keys from webhook to claim; every landing page, the language switch, the docs, sitemap and robots; phone width; and that the page makes no request to any other website.
 
 ## License
 
