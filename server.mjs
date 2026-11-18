@@ -31,10 +31,11 @@ const USE_MLX = env.ENGINE === 'mlx' && fs.existsSync(MLX);
 const MODEL = env.WHISPER_MODEL || path.join(os.homedir(), 'Library/Application Support/transcribe/ggml-large-v3-turbo.bin');
 const DONORS = env.DONORS_FILE || path.join(DIR, 'data/donors.json');
 const OLLAMA = env.OLLAMA_URL || 'http://127.0.0.1:11434';   // local only: transcript text never leaves this machine
-const POLISH_MODEL = env.POLISH_MODEL ?? 'gemma3:4b';          // set to an empty string to switch the cleanup pass off
-// The summary needs judgement (who does what, what was decided), where the small model invents roles and fills empty
-// sections. A larger one writes it; it is one short answer per recording, so the extra time is seconds.
-const SUMMARY_MODEL = env.SUMMARY_MODEL || 'gemma3:12b';
+// One model writes the paragraphs and the summary. gemma3:12b rather than the faster 4b: side by side it put commas in
+// the right places and broke paragraphs at each change of speaker, and it does not invent roles in summaries.
+// Set POLISH_MODEL to an empty string to switch both off; SUMMARY_MODEL can name a different model for the summary.
+const POLISH_MODEL = env.POLISH_MODEL ?? 'gemma3:12b';
+const SUMMARY_MODEL = env.SUMMARY_MODEL || POLISH_MODEL;
 const TMP = env.TMP_DIR || path.join(os.tmpdir(), 'transcribe-uploads');
 
 const MAX_BYTES = 100 * 1024 * 1024;   // Cloudflare's free-plan upload ceiling
@@ -231,14 +232,22 @@ export function reflow(paras, target = 450) {
     return cur ? [...out, cur] : out;
   });
 }
+// The model takes about 11 GB, so it is in memory only while there is work for it: loaded when a job that wants
+// paragraphs or a summary starts transcribing (it loads while Whisper runs), dropped when the last such job is finished.
+// The short keep_alive values are the safety net: after a crash or restart Ollama lets go on its own within minutes.
+let wanting = 0;
+const setModel = keep_alive => { for (const model of new Set([POLISH_MODEL, SUMMARY_MODEL]))
+  fetch(OLLAMA + '/api/generate', { method: 'POST', body: JSON.stringify({ model, keep_alive }) }).then(r => r.arrayBuffer()).catch(() => {}); };   // no prompt: load or unload only
+const need = () => { if (wanting++ === 0) setModel('5m'); };
+const release = () => { if (--wanting === 0) setModel(0); };
 let polishing = Promise.resolve();   // one cleanup at a time, alongside the transcription worker
 // One stretch of text through the model. Returns its paragraphs, or null if it changed any word.
 // num_ctx 4096 on purpose: on this Mac the model writes about 1.6x faster than at 8192, and no call here needs more.
 // maxTokens matters: left alone, the model sometimes keeps writing (it was seen producing 1,800 tokens for a passage
 // that needs 350), which held up every paragraph and the summary behind it. A cut-off answer simply fails the word check.
 async function ask(system, user, maxTokens, model = POLISH_MODEL) {
-  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(90e3), body: JSON.stringify({
-    model, stream: false, keep_alive: '10m', options: { temperature: 0, num_ctx: 4096, num_predict: maxTokens },
+  const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: AbortSignal.timeout(180e3), body: JSON.stringify({
+    model, stream: false, keep_alive: '2m', options: { temperature: 0, num_ctx: 4096, num_predict: maxTokens },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
   if (!r.ok) throw new Error('ollama answered ' + r.status);
   return (await r.json()).message.content.trim();
@@ -333,16 +342,18 @@ async function polish(job) {
     p.status = 'done';
     console.log(`polish done ${Math.round((Date.now() - t0) / 1000)}s` + (total ? `, model text kept for ${Math.round(100 * kept / total)}%` : ''));
   } catch (e) { console.error('polish:', e.message); p.status = 'failed'; }
+  finally { release(); }
 }
 async function pump() {
   if (running || !queue.length) return;
   const job = running = queue.shift();
   job.status = 'processing';
+  if (job.polish) need();
   try {
     job.result = await transcribe(job); job.status = 'done';
     if (job.polish) polishing = polishing.then(() => polish(job));   // the transcript is already available; paragraphs follow
   }
-  catch (e) { job.status = 'error'; job.error = e.message; }
+  catch (e) { job.status = 'error'; job.error = e.message; if (job.polish) release(); }   // failed or cancelled: nothing left for the model to do
   job.finished = Date.now();
   console.log(`job ${job.status} ${job.result?.duration ?? 0}s ${job.donor ? 'donor' : 'free'}`);   // counts only, nothing personal
   if (job.status === 'done') { count('done'); count('minutes', job.result.duration / 60); } else count('failed');
