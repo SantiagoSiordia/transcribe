@@ -145,7 +145,7 @@ input:focus{outline:none;border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,22
 .bar{width:min(320px,100%);height:4px;border-radius:2px;background:#E8E6FC;overflow:hidden;display:none}
 .busy .bar,.drop.up .bar{display:block;margin:4px 0}
 .drop.up #dropSub{font-family:var(--mono);color:#3730A3}
-.bar i{display:block;height:100%;border-radius:2px;background:#4F46E5;transform-origin:left;transform:scaleX(var(--p,0));transition:transform .3s var(--ease)}
+.bar i{display:block;height:100%;border-radius:2px;background:#4F46E5;transform-origin:left;transform:scaleX(var(--p,0));transition:transform .25s linear}
 .bar.scan i{width:40%;animation:scan 1.3s ease-in-out infinite}
 @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 #status,#segs time,.row span,code{font-family:var(--mono)}
@@ -558,16 +558,29 @@ async function poll(id, name) {
   active = id;
   await follow(id, name);
 }
+// The engine reports progress in coarse jumps (5% steps, or one jump per 30 seconds of audio). Between reports the
+// number counts up on its own at the pace the time estimate implies, never more than one jump ahead of the last real
+// figure and never backwards, so it moves 1% at a time and still cannot run away from the truth.
+let live = null, shown = 0, ticker = null;
+function tick() {
+  if (!live || !busy) { clearInterval(ticker); ticker = null; shown = 0; return; }
+  const left = Math.max(live.eta - (Date.now() - live.at) / 1000, 1);
+  const pace = (1 - shown) * 0.2 / left;   // per 200 ms tick, to arrive at 100% when the estimate says
+  shown = Math.min(shown + Math.min(shown < live.real ? 0.01 : pace, 0.01), live.real + 0.05, 0.99);   // behind the real figure: catch up, still 1% at a time
+  bar(shown);
+  status(T.progress.replace('{p}', Math.floor(shown * 100)) + ' ' + (left < 60 ? T.etaSoon : T.eta.replace('{m}', Math.round(left / 60))));
+}
 async function follow(id, name) {
   if (active !== id) return;
   let r;
   try { r = await (await fetch('/api/jobs/' + id)).json(); } catch { return setTimeout(follow, 4000, id, name); }   // a network blip is not the end
   if (r.status === 'queued') status(T.queued.replace('{n}', r.position));
+  if (r.status === 'queued') { live = null; bar(null); return setTimeout(follow, 2000, id, name); }
   if (r.status === 'processing') {
-    const left = r.eta == null ? '' : ' ' + (r.eta < 60 ? T.etaSoon : T.eta.replace('{m}', Math.round(r.eta / 60)));
-    status(r.progress ? T.progress.replace('{p}', Math.round(r.progress * 100)) + left : T.working + left);
+    if (r.eta == null) { bar(null); status(T.working); }   // still converting the audio
+    else { live = { real: r.progress || 0, eta: r.eta, at: Date.now() }; ticker ||= setInterval(tick, 200); tick(); }
+    return setTimeout(follow, 1000, id, name);
   }
-  if (r.status === 'queued' || r.status === 'processing') { bar(r.progress || null); return setTimeout(follow, r.status === 'queued' ? 2000 : 1000, id, name); }
   if (r.status !== 'done') {
     const saved = JSON.parse(localStorage.getItem('transcripts') || '[]');   // another tab may have collected it already
     if (!saved.some(x => x.id === id)) return fail(0, r);

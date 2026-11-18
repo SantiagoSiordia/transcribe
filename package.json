@@ -1,0 +1,15 @@
+{
+  "name": "transcribe",
+  "private": true,
+  "description": "Free, open-source audio transcription with local Whisper. The server has no dependencies; Playwright is only for the end-to-end tests.",
+  "license": "MIT",
+  "scripts": {
+    "start": "node --env-file=.env server.mjs",
+    "test": "node server.test.mjs",
+    "e2e": "playwright test",
+    "e2e:real": "E2E_REAL=1 playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}

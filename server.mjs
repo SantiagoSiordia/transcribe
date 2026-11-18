@@ -154,15 +154,18 @@ async function transcribe(job) {
     if (!jobs.has(job.id)) throw new Error('cancelled');   // cancelled during conversion
     Object.assign(job, { seconds, started: Date.now(), progress: 0 });
     const fail = e => { console.error('whisper:', e.message); throw new Error('transcription failed'); };
+    const secs = t => t.split(':').reduce((n, x) => n * 60 + Number(x), 0);   // "01:02:03.500" -> seconds
     if (USE_MLX) {
       // progress: each printed line is "[start --> end] text"; the end time against the audio length
-      const secs = t => t.split(':').reduce((n, x) => n * 60 + Number(x), 0);
       await run(MLX, [wav, '--model', MLX_MODEL, '--output-format', 'json', '--output-dir', path.dirname(out), '--output-name', path.basename(out),
         '--verbose', 'True', ...(job.language === 'auto' ? [] : ['--language', job.language])], 90 * 60e3,
         s => { for (const m of s.matchAll(/-->\s*([\d:.]+)\]/g)) job.progress = Math.min(secs(m[1]) / seconds, 0.99); }, job).catch(fail);
     } else {
       await run(WHISPER, ['-m', MODEL, '-f', wav, '-l', job.language, '-oj', '-of', out, '-np', '-pp', '-t', '8', ...FAST], 90 * 60e3,
-        s => { for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.min(Number(m[1]) / 100, 0.99); }, job).catch(fail);
+        s => {   // two sources: the 5% reports, and each finished segment's end time; whichever is further along
+          for (const m of s.matchAll(/progress =\s*(\d+)%/g)) job.progress = Math.max(job.progress, Math.min(Number(m[1]) / 100, 0.99));
+          for (const m of s.matchAll(/-->\s*([\d:.]+)\]/g)) job.progress = Math.max(job.progress, Math.min(secs(m[1]) / seconds, 0.99));
+        }, job).catch(fail);
     }
     // learn this machine's speed from every finished job, so the first estimate of the next one is close
     rate = 0.7 * rate + 0.3 * Math.max((Date.now() - job.started) / 1000 - LOAD, 0.1) / seconds;
